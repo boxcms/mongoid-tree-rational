@@ -148,8 +148,8 @@ end
 There are two callbacks that are called before and after the rearranging process. This enables you to do additional computations after the documents position in the tree is updated. See `Mongoid::Tree` for details.
 
 Example:
-  
-```ruby 
+
+```ruby
 class Page
   include Mongoid::Document
   include Mongoid::Tree
@@ -213,4 +213,3 @@ A huge thanks to [Benedikt Deicke](https://github.com/benedikt) for all the work
 ## Copyright
 
 See LICENSE for details.
-
