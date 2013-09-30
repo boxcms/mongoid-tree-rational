@@ -81,6 +81,7 @@ module Mongoid
 
     autoload :Ordering, 'mongoid/tree/ordering'
     autoload :Traversal, 'mongoid/tree/traversal'
+    autoload :RationalNumbering, 'mongoid/tree/rational_numbering'
 
     included do
       has_many :children, :class_name => self.name, :foreign_key => :parent_id, :inverse_of => :parent, :validate => false

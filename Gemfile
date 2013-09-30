@@ -1,7 +1,17 @@
-source :rubygems
+source "http://rubygems.org"
 
-gemspec
+gem 'mongoid'
 
-gem 'guard-rspec', '>= 0.6.0'
-gem 'ruby_gntp',   '>= 0.3.4'
-gem 'rb-fsevent' if RUBY_PLATFORM =~ /darwin/
+group :development do
+  gem 'rake'
+  gem 'rspec'
+  gem 'yard'
+  gem 'jeweler'
+  gem 'guard-rspec', '>= 2.6.0'
+  gem 'rb-inotify', :require => false
+  gem 'rb-fsevent', :require => false
+  gem 'wdm', :platforms => [:mswin, :mingw], :require => false
+  gem 'hirb'
+  gem 'wirble'
+  gem 'awesome_print'
+end

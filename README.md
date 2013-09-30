@@ -1,4 +1,4 @@
-# mongoid-tree [![Build Status](https://secure.travis-ci.org/benedikt/mongoid-tree.png?branch=master)](http://travis-ci.org/benedikt/mongoid-tree) [![Dependency Status](https://gemnasium.com/benedikt/mongoid-tree.png)](http://gemnasium.com/benedikt/mongoid-tree)
+# mongoid-tree [![Build Status](https://secure.travis-ci.org/boxcms/mongoid-tree-rational.png?branch=master)](http://travis-ci.org/boxcms/mongoid-tree-rational) [![Dependency Status](https://gemnasium.com/boxcms/mongoid-tree-rational.png)](http://gemnasium.com/boxcms/mongoid-tree-rational)
 
 A tree structure for Mongoid documents using the materialized path pattern
 
@@ -6,27 +6,26 @@ A tree structure for Mongoid documents using the materialized path pattern
 
 * mongoid (~> 3.0)
 
-For a mongoid 2.x compatible version, please use mongoid-tree 0.7.x!
-
+This version will only support mongoid 3.0+
 
 ## Install
 
-To install mongoid_tree, simply add it to your Gemfile:
+To install mongoid_tree_rational, simply add it to your Gemfile:
 
-    gem 'mongoid-tree', :require => 'mongoid/tree'
+    gem 'mongoid-tree-rational', :require => 'mongoid/tree-rational'
 
 In order to get the latest development version of mongoid-tree:
 
-    gem 'mongoid-tree', :git => 'git://github.com/benedikt/mongoid-tree', :require => 'mongoid/tree'
+    gem 'mongoid-tree-rational', :git => 'git://github.com/boxcms/mongoid-tree-rational', :require => 'mongoid/tree-rational'
 
-You might want to remove the `:require => 'mongoid/tree'` option and explicitly `require 'mongoid/tree'` where needed and finally run
+You might want to remove the `:require => 'mongoid/tree-rational'` option and explicitly `require 'mongoid/tree-rational'` where needed and finally run
 
     bundle install
 
 
 ## Usage
 
-Read the API documentation at http://benedikt.github.com/mongoid-tree and take a look at the `Mongoid::Tree` module
+Read the API documentation at http://boxcms.github.com/mongoid-tree-rational and take a look at the `Mongoid::Tree` module
 
 ```ruby
 class Node
@@ -185,31 +184,33 @@ end
 
 ## Build Status
 
-mongoid-tree is on [Travis CI](http://travis-ci.org/benedikt/mongoid-tree) running the specs on Ruby Head, Ruby 1.9.3, JRuby (1.9 mode), and Rubinius (1.9 mode).
+mongoid-tree is on [Travis CI](http://travis-ci.org/boxcms/mongoid-tree-rational) running the specs on Ruby Head, Ruby 1.9.3, JRuby (1.9 mode), and Rubinius (1.9 mode).
 
 ## Known issues
 
-See [https://github.com/benedikt/mongoid-tree/issues](https://github.com/benedikt/mongoid-tree/issues)
+See [github.com/boxcms/mongoid-tree-rational/issues](https://github.com/boxcms/mongoid-tree-rational/issues)
 
 
 ## Repository
 
-See [https://github.com/benedikt/mongoid-tree](https://github.com/benedikt/mongoid-tree) and feel free to fork it!
+See [github.com/boxcms/mongoid-tree-rational](https://github.com/boxcms/mongoid-tree-rational) and feel free to fork it!
 
+
+## Rational Numbers
+
+Details about rational numbers in nested trees can be found here: [http://arxiv.org/pdf/0806.3115v1.pdf](http://arxiv.org/pdf/0806.3115v1.pdf)
+
+## MongoMapper version
+
+Have a look here: [github.com/leifcr/mm-tree](https://github.com/leifcr/mm-tree)
 
 ## Contributors
 
-See a list of all contributors at [https://github.com/benedikt/mongoid-tree/contributors](https://github.com/benedikt/mongoid-tree/contributors). Thanks a lot everyone!
+See a list of all contributors at [github.com/boxcms/mongoid-tree-rational/contributors](https://github.com/boxcms/mongoid-tree-rational/contributors). Thanks!
 
-
-## Support
-
-If you like mongoid-tree and want to support the development, I would appreciate a small donation:
-
-[![Pledgie](http://www.pledgie.com/campaigns/12137.png?skin_name=chrome)](http://www.pledgie.com/campaigns/12137)
-
-[![Flattr](https://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=benediktdeicke&url=https://github.com/benedikt/mongoid-tree&title=mongoid-tree&language=&tags=github&category=software)
+A huge thanks to [Benedikt Deicke](https://github.com/benedikt) for all the work on mongoid-tree. This rational number version is based on his work
 
 ## Copyright
 
-Copyright (c) 2010-2012 Benedikt Deicke. See LICENSE for details.
+See LICENSE for details.
+

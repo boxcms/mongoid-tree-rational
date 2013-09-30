@@ -34,3 +34,15 @@ end
 class EmbeddedDocument
   include Mongoid::Document
 end
+
+
+class RationalNumberedNode
+  include Mongoid::Document
+  include Mongoid::Tree
+  include Mongoid::Tree::Traversal
+  include Mongoid::Tree::RationalNumbering
+
+  field :name
+
+  attr_accessible :name
+end
