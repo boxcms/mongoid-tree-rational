@@ -1,10 +1,14 @@
+I18n.load_path << File.expand_path('../../locale/en.yml', __FILE__)
+
+require 'rational_number'
+
 module Mongoid
   module Tree
     ##
     # = Mongoid::Tree::RationalNumbering
     #
-    # Mongoid::Tree doesn't use rational numbers by defailt. To enable rational numbering
-    # of children include both Mongoid::Tree and Mongoid::Tree::RationalNumbering into 
+    # Mongoid::Tree doesn't use rational numbers by default. To enable rational numbering
+    # of children include both Mongoid::Tree and Mongoid::Tree::RationalNumbering into
     # your document.
     #
     # == Utility methods
@@ -13,25 +17,36 @@ module Mongoid
     module RationalNumbering
       extend ActiveSupport::Concern
 
+      @@_disable_timestamp_count = 0
+
       included do
-        field :rational_number_value, :type => Float
         field :rational_number_nv,    :type => Integer, :default => 0
-        field :rational_number_dv,    :type => Integer, :default => 0
-        field :rational_number_snv,   :type => Integer, :default => 0
+        field :rational_number_dv,    :type => Integer, :default => 1
+        field :rational_number_snv,   :type => Integer, :default => 1
         field :rational_number_sdv,   :type => Integer, :default => 0
+        field :rational_number_value, :type => Float
 
-        # TODO: Implement check for nested children! Should not nest children.
-        #validate          :will_save_tree
-        
-        before_validation :set_rational_numbers_if_missing
+        #validate          :validate_rational_hierarchy
 
-        # after_validation  :update_rational_numbers
-        after_rearrange   :update_rational_numbers
-        after_save        :move_children
-        before_destroy    :destroy_descendants
-        # before_save :assign_default_position, :if => :assign_default_position?
-        # before_save :reposition_former_siblings, :if => :sibling_reposition_required?
-        # after_destroy :move_lower_siblings_up
+        # after_rearrange   :assign_initial_rational_number, :if => :assign_initial_rational_number?
+
+        # after_rearrange   :set_initial_rational_number, :if :set_initial_rational_number?
+
+        after_rearrange   :update_rational_number, :if => :update_rational_number?
+
+        # Rekey former siblings to avoid gaps in the rational structure
+        after_save        :rekey_former_siblings, :if => :rekey_former_siblings?
+
+        # Rekey all the children of the node if needed
+        after_save        :rekey_children, :if => :rekey_children?
+
+        ### ??? ADD SOME STRATEGY???
+        # before_destroy    :destroy_descendants
+
+        after_destroy :move_lower_siblings
+
+        default_scope asc(:rational_number_value)
+
       end # included do
 
       module ClassMethods
@@ -42,520 +57,597 @@ module Mongoid
         # Force all rational number keys to update
         #
         # Can be used to remove any "gaps" that are in a tree
-        # 
+        #
         # For large collections, this uses a lot of resources, and should probably be used
-        # in a backround job on production sites. As a rational tree works just fine even 
+        # in a backround job on production sites. As a rational tree works just fine even
         # if there are missing items, this shouldn't  be necessary to do that often.
 
-        def update_all_rational_numbers!
-          # rekey keys for each root. will do children 
+        def rekey_all!
+          # rekey keys for each root. will do children
           _pos = 1
+          root_rational = RationalNumber.new
           self.roots.each do |root|
-            new_keys = keys_from_parent_keys_and_position({:nv => 0, :dv => 1, :snv => 1, :sdv => 0}, _pos)
-            if !compare_keys(root.tree_keys(), new_keys)
-              root.move_nv_dv(new_keys[:nv], new_keys[:dv], {:ignore_conflict => true})
+            new_rational = root_rational.child_from_position(_pos)
+            if new_rational != self.rational_number
+              root.move_to_rational_number(new_rational.nv, new_rational.dv, {:force => true})
               root.save!
-              root.reload
+              # root.reload # Should caller be responsible for reloading?
             end
-            root.rekey_children
+            #root.rekey_children
             _pos += 1
           end
         end
 
-
-        ##
-        # By a given set of parent keys and postion, the keys for a child can be calculated
-        #
-        # @param [Hash] containing :nv, :dv, :snv and :sdv for a given parent node
-        # @param [Integer] for the given position starting at position/value 1
-        #
-        # @return [Hash] containing :nv, :dv, :snv and :sdv for the given position
-
-        def keys_from_parent_keys_and_position(parent_keys, position)
-          { :nv => parent_keys[:nv] + (position * parent_keys[:snv]),
-            :dv => parent_keys[:dv] + (position * parent_keys[:sdv]),
-            :snv => parent_keys[:nv] + ((position + 1) * parent_keys[:snv]),
-            :sdv => parent_keys[:dv] + ((position + 1) * parent_keys[:sdv]) }
-        end
-
-        ##
-        # Compare key1 with key2 for equality
-        #
-        # @param [Hash] key1 with :nv, :dv, :snv and :sdv to compare (rational numbers for item)
-        # @param [Hash] key2 with :nv, :dv, :snv and :sdv to compare (rational numbers for item)
-        #
-        # @return [Boolean] true for equal, else false
-        
-        def compare_keys(key1, key2)
-        ( (key1[:nv] === key2[:nv]) and
-          (key1[:dv] === key2[:dv]) and
-          (key1[:snv] === key2[:snv]) and
-          (key1[:sdv] === key2[:sdv]))
-        end
-
-        ##
-        # Get the position from a given nv and dv value
-        #
-        # @param [Integer] nv - the nominator for the given node
-        # @param [Integer] dv - the denominator for the given node
-        #
-        # @return [Integer] position for the given nv/dv values
-
-        def position_from_nv_dv(nv, dv)
-          anc_tree_keys = ancestor_tree_keys(nv, dv)
-          (nv - anc_tree_keys[:nv]) / anc_tree_keys[:snv]
-        end
-        
-        ##
-        # Get ancestor nv, dv, snv, sdv values as hash for a given nv/dv combination
-        #
-        # @param [Integer] nv - the nominator for the given node
-        # @param [Integer] dv - the denominator for the given node
-        #
-        # @return [Hash] containing :nv, :dv, :snv and :sdv for the given position
-
-        def ancestor_tree_keys(nv,dv)
-          numerator = nv
-          denominator = dv
-          ancnv = 0
-          ancdv = 1
-          ancsnv = 1
-          ancsdv = 0
-          rethash = {:nv => ancnv, :dv => ancdv, :snv => ancsnv, :sdv => ancsdv}
-          # make sure we break if we get root values! (numerator == 0 + denominator == 0)
-          #max_levels = 10
-          while ((ancnv < nv) && (ancdv < dv)) && ((numerator > 0) && (denominator > 0))# && (max_levels > 0)
-            #max_levels -= 1
-            div = numerator / denominator
-            mod = numerator % denominator
-            # set return values to previous values, as they are the parent values
-            rethash = {:nv => ancnv, :dv => ancdv, :snv => ancsnv, :sdv => ancsdv}
-
-            ancnv = ancnv + (div * ancsnv)
-            ancdv = ancdv + (div * ancsdv)
-            ancsnv = ancnv + ancsnv
-            ancsdv = ancdv + ancsdv
-
-            numerator = mod
-            if (numerator != 0)
-              denominator = denominator % mod
-              if denominator == 0
-                denominator = 1
-              end
-            end
-          end
-          return rethash
-        end #get_ancestor_keys(nv,dv)
-
-      # THIS IS FROM THE MONGOMAPPER PLUGIN. HAS TO BE FIXED
-      def initialize(*args)
-        @_will_move = false
-        @_rational_numbers_set = false
-        super
-      end
-
       end # Classmethods
 
-      ## 
-      # Get the keys from the next sibling (calculation)
+
+      ##
+      # Initialize the rational tree document
       #
-      # This is used for sdv and snv values when setting the nv/dv on a node
-      # 
-      # @return [Hash] containing :nv, :dv, :snv and :sdv for the next sibling
-
-      def next_sibling_keys
-        keys_from_position(self.class.position_from_nv_dv(self.rational_number_nv, self.rational_number_dv) +1)
-      end
-
-      ## 
-      # Get the ancestor keys from calculation instead of query
-      # Only used to to save queries and should be used with caution, as it does not
-      # verify if the ancestor exists
-      # 
-      # @return [Hash] containing :nv, :dv, :snv and :sdv for the ancestor
-
-      def ancestor_tree_keys
-        self.class.ancestor_tree_keys(self.rational_number_nv, self.rational_number_dv)
-      end
-
-      def tree_keys
-        { :nv => self.rational_number_nv, 
-          :dv => self.rational_number_dv, 
-          :snv => self.rational_number_snv, 
-          :sdv => self.rational_number_sdv}
-      end
-
-      ## 
-      # Get the ancestor keys from a query instead of calculation
+      # @return [undefined]
       #
-      # @return [Hash] containing :nv, :dv, :snv and :sdv for the ancestor
-
-      def query_ancestor_tree_keys
-        check_parent = self.where(:_id => self[:parent_ids]).first
-        return nil if (check_parent.nil? || check_parent == [])
-        rethash = {:nv  => check_parent.rational_number_nv, 
-                   :dv  => check_parent.rational_number_dv, 
-                   :snv => check_parent.rational_number_snv, 
-                   :sdv => check_parent.rational_number_sdv}
-      end
-
-      ## 
-      # Verify if the node has correct parent given the nv/dv combination
-      # 
-      # @param [Integer] nv - the nominator for the given node
-      # @param [Integer] dv - the denominator for the given node
-      # 
-      # @return [Boolean] true for correct parent
-      def correct_parent?(nv, dv)
-        # get nv/dv from parent
-        check_ancestor_keys = query_ancestor_tree_keys()
-        return false if (check_ancestor_keys == nil)
-        calc_ancestor_keys = self.class.ancestor_tree_keys(nv, dv)
-        if ( (calc_ancestor_keys[:nv] == check_ancestor_keys[:nv]) \
-          && (calc_ancestor_keys[:dv] == check_ancestor_keys[:dv]) \
-          && (calc_ancestor_keys[:snv] == check_ancestor_keys[:snv]) \
-          && (calc_ancestor_keys[:sdv] == check_ancestor_keys[:sdv]) \
-          )
-          return true
-        end
+      def initialize(*args)
+        super
+        rational_number({:force => true})
       end
 
       ##
-      # Set the nv and dv position
       #
-      # @param [Integer] nv - the nominator for the given node
-      # @param [Integer] dv - the denominator for the given node
-
-      def set_position(nv, dv)
-        self.rational_number_nv = nv
-        self.rational_number_dv = dv
-      end
-
-      ## 
-      # Update the rational numbers on a node
-      #       
-      # Should calculate next free nv/dv and se if parent has changed.
+      # Validate that this document has the correct parent document through a query!
       #
-      # @param [Hash] opts    - :position - the position to use when setting new keys
-      #                         :force - force setting new nv/dv values
-
-      def update_rational_numbers(opts = {})
-        if @_rational_numbers_set == true
-          @_rational_numbers_set = false
-          return
-        end
-        # if changes include both parent_id, tree_info.nv and tree_info.dv, 
-        # checking in validatioon that the parent is correct.
-        # if change is only nv/dv, check if parent is correct, move it...
-        if (self.changes.include?("rational_number_") && self.changes.include?("rational_number_dv"))
-          self.move_nv_dv(self.rational_number_nv, self.rational_number_dv)
-        elsif (self.changes.include?(:parent_ids)) || opts[:force]
-          # only changed parent, needs to find next free position
-          # use function for "missing nv/dv"
-          new_keys = self.keys_from_position((self.has_siblings? + 1)) if !opts[:position]
-          new_keys = self.keys_from_position((opts[:position] + 1)) if opts[:position]
-          self.move_nv_dv(new_keys[:nv], new_keys[:dv])
-        end
-      end
-
-      ##
-      # Force update of rational numbers
-
-      def update_rational_numbers!(opts = {})
-        update_rational_numbers({:force => true}.merge(opts))
-      end
-
-      ##
-      # Sets initial nv, dv, snv and sdv values and float value
-      # 
-      # Used on create callback
-
-      def set_rational_numbers_if_missing
-        if (self.rational_number_nv == 0 || self.rational_number_dv == 0 )
-          last_sibling = self.siblings.last
-          if (last_sibling == nil)
-            last_sibling_position = 0
-          else
-            last_sibling_position = self.class.position_from_nv_dv(last_sibling.rational_number_nv, last_sibling.rational_number_dv)
-          end
-          new_keys = self.keys_from_position((last_sibling_position + 1) )
-          self.rational_number_nv = new_keys[:nv]
-          self.rational_number_dv = new_keys[:dv]
-          self.rational_number_snv = new_keys[:snv]
-          self.rational_number_sdv = new_keys[:sdv]
-          self.rational_number_value = Float(new_keys[:nv]/Float(new_keys[:dv]))
-          @_rational_numbers_set = true
-        end
-      end
-
-      ##
-      # Move rational position to given nv and dv
+      # @return true for valid, else false
       #
-      # if conflcting item on new position, shift all siblings right and insert
-      # can force move without updating conflicting siblings
-      #
-      # @param [Integer] nv - the nominator for the given node
-      # @param [Integer] dv - the denominator for the given node
-      # @param [Hash] opts - :ignore_conflict - force setting new nv/dv values and ignore conflicting items
-      # 
-      def move_rational_position(nv, dv, opts = {})
-        position = self.class.position_from_nv_dv(nv, dv)
-        if !self.root?
-          anc_keys = self.class.ancestor_tree_keys(nv, dv)
-          rnv = anc_keys[:nv] + ((position + 1) * anc_keys[:snv])
-          rdv = anc_keys[:dv] + ((position + 1) * anc_keys[:sdv])
-        else
-          rnv = position + 1
-          rdv = 1
-        end
-
-        # don't check for conflict if forced move
-        if (!opts[:ignore_conflict])
-          conflicting_sibling = self.where(:rational_number_nv => nv).where(:rational_number_dv => dv).first
-          if (conflicting_sibling != nil) 
-            self.disable_timestamp_callback()
-            # find nv/dv to the right of conflict
-            # find position/count for this item
-            next_keys = conflicting_sibling.next_sibling_keys
-            conflicting_sibling.set_position(next_keys[:nv], next_keys[:dv])
-            conflicting_sibling.save
-            self.enable_timestamp_callback()
+      def validate_rational_hierarchy
+        if (self.rational_number_nv_changed? && self.rational_number_dv_changed? && self.changes.include?(parent_ids))
+          if !correct_rational_parent?(self.rational_number_nv, self.rational_number_dv)
+            errors.add(:base, I18n.t(:cyclic, :scope => [:mongoid, :errors, :messages, :tree]))
           end
         end
+      end
+
+      ##
+      #
+      # Force update of the rational number on the document
+      #
+      # @param  [Hash] Options
+      #
+      # Options can be:
+      #
+      # :force => force an update on the rational number
+      # :position => force position for the rational number
+      #
+      # @return [undefined]
+      #
+      def update_rational_number!(opts = {})
+        update_rational_number({:force => true}.merge(opts))
+      end
+
+      ##
+      #
+      # Move the document to a given position (integer based, starting with 1)
+      #
+      # if a document exists on the new position, all siblings are shifted right before moving this document
+      # can move without updating conflicting siblings by using :force in options
+      #
+      # @param [Integer] The positional value
+      # @param [Hash] Options: :force (defaults to false)
+      #
+      # @return [undefined]
+      #
+      def move_to_position(_position, opts = {})
+       # puts "move_to_position #{self.name} #{_position} #{opts[:force].inspect}"
+        # get rational number from position from "parent"
+        new_rational_number = parent_rational_number.child_from_position(_position)
+
+        move_conflicting_nodes(new_rational_number.nv, new_rational_number.dv) if (!opts[:force])
 
         # shouldn't be any conflicting sibling now...
-        self.rational_number_nv    = nv
-        self.rational_number_dv    = dv
-        self.rational_number_snv   = rnv
-        self.rational_number_sdv   = rdv
-        self.rational_number_value = Float(self.rational_number_nv)/Float(self.rational_number_dv)
-        # as this is triggered from after_validation, save should be triggered by the caller.
-      end
+        self.from_rational_number(new_rational_number)
 
-      ##
-      # Temporarily disable timestamp callbacks when this item shifts other items around
-      #
-
-      def disable_timestamp_callback
-        if self.respond_to?("updated_at")
-          @@_disable_timestamp_count += 1
-          self.class.skip_callback(:save, :before, :set_updated_at ) 
+        if (!!opts[:force])
+         # puts "forcefully move #{self.name} to position #{_position} nv: #{new_rational_number.nv} dv :#{new_rational_number.dv}"
         end
       end
 
       ##
-      # Enable timestamp callbacks (must be called after disable_timestamp_callback blocks are done)
+      #
+      # Move the document to a given rational_number position
+      #
+      # if a document exists on the new position, all siblings are shifted right before moving this document
+      # can move without updating conflicting siblings by using :ignore_conflicts in options
+      #
+      # @param [Integer] The nominator value
+      # @param [Integer] The denominator value
+      # @param [Hash] Options: :force (defaults to false)
+      #
+      # @return [undefined]
+      #
+      def move_to_rational_number(nv, dv, opts = {})
+       # puts "move_to_rational_number #{self.name} #{nv}/#{dv} #{opts[:force].inspect}"
+
+        # don't check for conflict if forced move
+        move_conflicting_nodes(nv,dv) if (!opts[:force])
+
+        # shouldn't be any conflicting sibling now...
+        self.from_rational_number(RationalNumber.new(nv,dv))
+
+        if (!!opts[:force])
+         # puts "forcefully move #{self.name} to  #{nv}/#{dv} position :#{self.position}# puts #{self.rational_number.inspect}"
+        end
+      end
+
+      ##
+      #
+      # Move conflicting nodes for a given value
+      #
+      # @param [Integer] The nominator value
+      # @param [Integer] The denominator value
+      #
+      def move_conflicting_nodes(nv,dv)
+        conflicting_sibling = base_class.where(:rational_number_nv => nv).where(:rational_number_dv => dv).excludes(:id => self.id).first
+        if (conflicting_sibling != nil)
+         # puts "move conflicting node #{conflicting_sibling.name} from #{nv}/#{dv}"
+          self.disable_timestamp_callback()
+          # find nv/dv to the right of conflict and move
+          next_key = conflicting_sibling.rational_number.next_sibling
+          conflicting_sibling.move_to_rational_number(next_key.nv, next_key.dv)
+          conflicting_sibling.save!
+          self.enable_timestamp_callback()
+        end
+      end
+
+      ##
+      #
+      # Set the position of this document.
+      # (alias for move_to_rational_number)
+      #
+      alias :set_position :move_to_rational_number
+
+
+      ##
+      #
+      # Query the ancestor rational number
+      #
+      # @return [RationalNumber] returns the rational number for the ancestor or nil for "not found"
+      #
+      def query_ancestor_rational_number
+        check_parent = base_class.where(:_id => self.parent_ids).first
+        return nil if (check_parent.nil? || check_parent == [])
+        check_parent.rational_number
+      end
+
+      ##
+      #
+      # Verifies parent keys from calculation and query
+      #
+      # @return [Boolean] true for correct, else false
+      #
+      def correct_parent?(nv, dv)
+        q_rational_number = query_ancestor_rational_number()
+        return false if (q_rational_number == nil)
+        return true  if self.rational_number.parent == q_rational_number
+        false
+      end
+
+      ##
+      # Check if children needs to be rekeyed
+      #
+      def rekey_children?
+        self.children? && (self.previous_changes.include?("rational_number_nv") || self.previous_changes.include?("parent_ids"))
+      end
+
+      ##
+      #
+      # Rekey each of the children (usually forcefully if a tree has gone "crazy")
+      #
+      # @return [undefined]
+      #
+      def rekey_children
+        _pos = 1
+        this_rational_number = self.rational_number
+        self.children.each do |child|
+          new_rational_number = this_rational_number.child_from_position(_pos)
+          move_node_and_save_if_changed(child, new_rational_number)
+          _pos += 1
+        end
+      end
+
+      def rekey_former_siblings?
+        self.previous_changes.include?("parent_id")
+      end
+
+      def rekey_former_siblings
+       # puts "rekey_former_siblings"
+        former_siblings = base_class.where(:parent_id => attribute_was('parent_id')).
+                                     and(:rational_number_value.gt => (attribute_was('rational_number_value') || 0)).
+                                     excludes(:id => self.id)
+        former_siblings.each do |prev_sibling|
+          new_rational_number = prev_sibling.parent_rational_number.child_from_position(prev_sibling.position - 1)
+          move_node_and_save_if_changed(prev_sibling, new_rational_number)
+        end
+      end
+
+      def move_node_and_save_if_changed(node, new_rational_number)
+        if new_rational_number != node.rational_number
+          node.move_to_rational_number(new_rational_number.nv, new_rational_number.dv, {:force => true})
+          node.save!
+          # node.reload # Should caller be responsible for reloading?
+        end
+      end
+
+      ##
+      #
+      # Not needed, as each child gets the rational number updated after updating path?
+      # @return [undefined]
+      #
+      # def children_update_rational_number
+      #   if rearrange_children?
+      #     _position = 0
+      #     # self.disable_timestamp_callback()
+      #     self.children.each do |child|
+      #       child.update_rational_number!(:position => _position)
+      #       _position += 1
+      #     end
+      #     # self.enable_timestamp_callback()
+      #   end
+      # end
+
+      ##
+      # Enable timestamping callback if existing
+      #
+      def enable_timestamp_callback
+
+      end
+
+      ##
+      # Disable timestamping callback if existing
+      #
+      def disable_timestamp_callback
+
+      end
+
+      ##
+      # Convert to rational number
+      #
+      # @return [RationalNumber] The rational number for this node
+      #
+      def rational_number(opts = {})
+        RationalNumber.new(self.rational_number_nv, self.rational_number_dv, self.rational_number_snv, self.rational_number_sdv)
+      end
+
+      ##
+      # Convert from rational number and set keys accordingly
+      #
+      # @param  [RationalNumber] The rational number for this node
+      # @return [undefined]
+      #
+      def from_rational_number(rational_number)
+        self.rational_number_nv    = rational_number.nv
+        self.rational_number_dv    = rational_number.dv
+        self.rational_number_snv   = rational_number.snv
+        self.rational_number_sdv   = rational_number.sdv
+        self.rational_number_value = rational_number.number
+      end
+
+      ##
+      # Returns a chainable criteria for this document's ancestors
+      #
+      # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's ancestors
+      def ancestors
+        base_class.unscoped { super }
+      end
+
+      ##
+      #
+      # Returns the positional value for the current node
+      #
+      def position
+        self.rational_number.position
+      end
+
+      ##
+      # Returns siblings below the current document.
+      # Siblings with a position greater than this document's position.
+      #
+      # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's lower siblings
+      def lower_siblings
+        self.siblings.where(:rational_number_value.gt => self.rational_number_value)
+      end
+
+      ##
+      # Returns siblings above the current document.
+      # Siblings with a position lower than this document's position.
+      #
+      # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's higher siblings
+      def higher_siblings
+        self.siblings.where(:rational_number_value.lt => self.rational_number_value)
+      end
+
+      ##
+      # Returns siblings between the current document and the other document
+      # Siblings with a position between this document's position and the other document's position.
+      #
+      # @return [Mongoid::Criteria] Mongoid criteria to retrieve the documents between this and the other document
+      def siblings_between(other)
+        range = [self.rational_number_value, other.rational_number_value].sort
+        self.siblings.where(:rational_number_value.gt => range.first, :rational_number_value.lt => range.last)
+      end
+
+      ##
+      # Return the siblings between this and other + other IF other has a higher position
+      #
+      def siblings_between_including_other(other)
+        self.siblings.where(:rational_number_value.gt => self.rational_number_value, :rational_number_value.lte => other.rational_number_value)
+      end
+
+      ##
+      # Returns the lowest sibling (could be self)
+      #
+      # @return [Mongoid::Document] The lowest sibling
+      def last_sibling_in_list
+        siblings_and_self.last
+      end
+
+      ##
+      # Returns the highest sibling (could be self)
+      #
+      # @return [Mongoid::Document] The highest sibling
+      def first_sibling_in_list
+        siblings_and_self.first
+      end
+
+      ##
+      # Is this the highest sibling?
+      #
+      # @return [Boolean] Whether the document is the highest sibling
+      def at_top?
+        higher_siblings.empty?
+      end
+
+      ##
+      # Is this the lowest sibling?
+      #
+      # @return [Boolean] Whether the document is the lowest sibling
+      def at_bottom?
+        lower_siblings.empty?
+      end
+
+      ##
+      # Move this node above all its siblings
+      #
+      # @return [undefined]
+      def move_to_top
+        return true if at_top?
+        move_above(first_sibling_in_list)
+      end
+
+      ##
+      # Move this node below all its siblings
+      #
+      # @return [undefined]
+      def move_to_bottom
+        return true if at_bottom?
+        move_below(last_sibling_in_list)
+      end
+
+      ##
+      # Move this node one position up
+      #
+      # @return [undefined]
+      def move_up
+        unless at_top?
+          prev_sibling = higher_siblings.first
+          switch_with_sibling(prev_sibling) unless prev_sibling.nil?
+        end
+      end
+
+      ##
+      # Move this node one position down
+      #
+      # @return [undefined]
+      def move_down
+        unless at_bottom?
+          next_sibling = lower_siblings.first
+          switch_with_sibling(next_sibling) unless next_sibling.nil?
+        end
+      end
+
+      ##
+      # Move this node above the specified node
+      #
+      # This method changes the node's parent if nescessary.
+      #
+      # @param [Mongoid::Tree] other document to move this document above
+      #
+      # @return [undefined]
+      def move_above(other)
+        ensure_to_be_sibling_of(other)
+        move_to_rational_number(other.rational_number_nv, other.rational_number_dv)
+        save!
+      end
+
+# TODO: MAKE GENERAL FUNCTION THAT SHIFTS ALL OBJECTS IN THE DIRECTION NEEDED TO INSERT THE
+# node at the needed position for move above/below
+
+      ##
+      # Move this node below the specified node
+      #
+      # This method changes the node's parent if nescessary.
+      #
+      # @param [Mongoid::Tree] other document to move this document below
+      #
+      # @return [undefined]
+      def move_below(other)
+       # puts "move_below #{self.name} below #{other.name}"
+        ensure_to_be_sibling_of(other)
+       # puts "Position of other: #{other.position}"
+       # puts "Position of self: #{self.position}"
+        # If there are nodes between this and other before move, make sure they are shifted upwards before moving
+        unless self.at_bottom?
+          pos = self.position
+          nodes_to_shift = self.siblings_between_including_other(other)
+          nodes_to_shift.each do |between_sibling|
+           # puts "moving between_sibling #{between_sibling.name} to #{pos}"
+            between_sibling.move_to_position(pos, {:force => true})
+            between_sibling.save!
+            pos += 1
+          end
+        end
+        move_to_position(other.position)
+        save!
+      end
+
+      ##
+      # Disable the timestamps for the document type, and increase the disable count
+      # Will only disable once, even if called multiple times
+      #
+      # @return [undefined]
+      def disable_timestamp_callback
+        if self.respond_to?("updated_at")
+          self.class.skip_callback(:save, :before, :update_timestamps ) if @@_disable_timestamp_count == 0
+          @@_disable_timestamp_count += 1
+        end
+      end
+
+      ##
+      # Enable the timestamps for the document type, and decrease the disable count
+      # Will only enable once, even if called multiple times
+      #
+      # @return [undefined]
       def enable_timestamp_callback
         if self.respond_to?("updated_at")
           @@_disable_timestamp_count -= 1
-          self.class.set_callback(:save, :before, :set_updated_at ) if @@_disable_timestamp_count <= 0
+          self.class.set_callback(:save, :before, :update_timestamps ) if @@_disable_timestamp_count == 0
         end
       end
 
-      ##
-      # Get keys from given position
-      #
-      # @param [Integer] for the given position starting at position/value 1
-      #
-      # @return [Hash] containing :nv, :dv, :snv and :sdv for the given position
-
-      def keys_from_position(position)
-        # replace with self.parent?
-        _parent = self.class.where(:_id => self.parent_id).first
-        _parent = nil if ((_parent.nil?) || (_parent == []))
-        ancnv = 0
-        ancsnv = 1
-        ancdv = 1
-        ancsdv = 0
-        if _parent != nil
-          ancnv  = _parent.rational_number_nv
-          ancsnv = _parent.rational_number_snv
-          ancdv  = _parent.rational_number_dv
-          ancsdv = _parent.rational_number_sdv
-        end
-        self.class.keys_from_parent_keys_and_position({:nv => ancnv, :dv => ancdv, :snv => ancsnv, :sdv => ancsdv}, position)
-      end
 
       ##
-      # Move the children to correct new position
-      def move_children
-        return
-        if @_will_move
-          @_will_move = false
-          _position = 0
-          self.disable_timestamp_callback()
-          self.children.each do |child|
-            child.update_path!
-            child.update_nv_dv!(:position => _position)
-            child.save
-            child.reload
-            _position += 1
+      #
+      # Update the rational numbers on the document if changes to parent
+      # or rational number has been changed
+      #
+      # Should calculate next free nv/dv and set that if parent has changed.
+      # (set values to "missing and call missing function should work")
+      #
+      # If there are both changes to nv/dv and parent_id, nv/dv settings takes
+      # precedence over parent_id changes
+      #
+      # @return [undefined]
+      #
+      def update_rational_number
+        ## puts "-- update_rational_number -- #{self.name} #{"nv: "+self.rational_number_nv.to_s if self.rational_number_nv_changed?} #{"dv: "+self.rational_number_dv.to_s if self.rational_number_dv_changed?} #{"parent" if self.parent_id_changed?} #{"initial nil" if set_initial_rational_number?}"
+        if self.rational_number_nv_changed? && self.rational_number_dv_changed? && !self.rational_number_value.nil?
+          self.move_to_rational_number(self.rational_number_nv, self.rational_number_dv)
+        elsif self.parent_id_changed? || set_initial_rational_number?
+          # only changed parent, needs to find next free position
+          # Get rational number from new parent
+
+          last_sibling = self.siblings.last
+
+          if (last_sibling.nil?)
+            new_rational_number = parent_rational_number.child_from_position(1)
+          else
+            new_rational_number = parent_rational_number.child_from_position(last_sibling.rational_number.position + 1)
           end
-          self.enable_timestamp_callback()
 
-          # enable_tree_callbacks()
-          @_will_move = true
+          self.move_to_rational_number(new_rational_number.nv, new_rational_number.dv)
+        end
+       # puts "updated #{self.name} position to value: nv:#{self.rational_number_nv} dv:#{self.rational_number_dv} position:#{self.position}"
+      end
+
+      ##
+      # Get the parent rational number or "root" rational number if no parent
+      #
+      def parent_rational_number
+        if root?
+          RationalNumber.new
+        else
+          self.parent.rational_number
         end
       end
 
+      ##
+      #
+      # Check if the rational number should be updated
+      #
+      # @return true if it should be updated, else false
+      #
+      def update_rational_number?
+        ## puts "#{self.name} changes: #{self.changes}"
+        set_initial_rational_number? || self.parent_id_changed? || (self.rational_number_nv_changed? && self.rational_number_dv_changed?)
+      end
+
+      ##
+      # Should the initial rational number value
+      #
+      def set_initial_rational_number?
+        self.rational_number_value.nil?
+      end
 
     private
 
-    end
-  end
+      ##
+      #
+      # Switch location with a given sibling
+      #
+      # @param [Mongoid::Tree] other document to switch places with
+      #
+      # @return [undefined]
+      #
+      def switch_with_sibling(sibling)
+        sibling.move_to_rational_number(self.rational_number_nv, self.rational_number_dv, {:force => true})
+        self.move_to_rational_number(sibling.rational_number_nv, sibling.rational_number_dv, {:force => true})
+        sibling.save!
+        save!
+      end
+
+      ##
+      #
+      # Ensure this is a sibling of given other, if not, move it to the same parent
+      #
+      # @param [Mongoid::Tree] other document to ensure sibling relation
+      #
+      # @return [undefined]
+      #
+      def ensure_to_be_sibling_of(other)
+        return if sibling_of?(other)
+        self.parent = other.parent
+        save!
+      end
+
+      # FIX THESE SHIT CASE FUCK!
+
+      def move_lower_siblings
+        ## puts "Moving lower siblings"
+        lower_siblings.each do |sibling|
+          disable_timestamp_callback
+          sibling.move_to_position(sibling.position - 1)
+          sibling.save
+          enable_timestamp_callback
+        end
+      end
+
+      # def reposition_former_siblings
+      #   former_siblings = base_class.where(:parent_id => attribute_was('parent_id')).
+      #                                and(:position.gt => (attribute_was('position') || 0)).
+      #                                excludes(:id => self.id)
+      #   former_siblings.inc(:position,  -1)
+      # end
+
+      # def sibling_reposition_required?
+      #   parent_id_changed? && persisted?
+      # end
+
+
+
+    end # RationalNumbering
+  end # Tree
+end # Mongoid
+
+##
+# The rational number is root and therefore has no siblings
+#
+class InvalidParentError < StandardError
 end
 
-
-
-# # TODO: FIX THESE TO USE NV/DV
-#       ##
-#       # Returns a chainable criteria for this document's ancestors
-#       #
-#       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's ancestors
-#       def ancestors
-#         base_class.unscoped.where(:_id.in => parent_ids)
-#       end
-
-#       ##
-#       # Returns siblings below the current document.
-#       # Siblings with a position greater than this document's position.
-#       #
-#       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's lower siblings
-#       def lower_siblings
-#         # self.siblings.where(:position.gt => self.position)
-#       end
-
-#       ##
-#       # Returns siblings above the current document.
-#       # Siblings with a position lower than this document's position.
-#       #
-#       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's higher siblings
-#       def higher_siblings
-#         self.siblings.where(:position.lt => self.position)
-#       end
-
-#       ##
-#       # Returns siblings between the current document and the other document
-#       # Siblings with a position between this document's position and the other document's position.
-#       #
-#       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the documents between this and the other document
-#       def siblings_between(other)
-#         range = [self.position, other.position].sort
-#         self.siblings.where(:position.gt => range.first, :position.lt => range.last)
-#       end
-
-#       ##
-#       # Returns the lowest sibling (could be self)
-#       #
-#       # @return [Mongoid::Document] The lowest sibling
-#       def last_sibling_in_list
-#         siblings_and_self.last
-#       end
-
-#       ##
-#       # Returns the highest sibling (could be self)
-#       #
-#       # @return [Mongoid::Document] The highest sibling
-#       def first_sibling_in_list
-#         siblings_and_self.first
-#       end
-
-#       ##
-#       # Is this the highest sibling?
-#       #
-#       # @return [Boolean] Whether the document is the highest sibling
-#       def at_top?
-#         higher_siblings.empty?
-#       end
-
-#       ##
-#       # Is this the lowest sibling?
-#       #
-#       # @return [Boolean] Whether the document is the lowest sibling
-#       def at_bottom?
-#         lower_siblings.empty?
-#       end
-
-#       ##
-#       # Move this node above all its siblings
-#       #
-#       # @return [undefined]
-#       def move_to_top
-#         return true if at_top?
-#         move_above(first_sibling_in_list)
-#       end
-
-#       ##
-#       # Move this node below all its siblings
-#       #
-#       # @return [undefined]
-#       def move_to_bottom
-#         return true if at_bottom?
-#         move_below(last_sibling_in_list)
-#       end
-
-#       ##
-#       # Move this node one position up
-#       #
-#       # @return [undefined]
-#       def move_up
-#         switch_with_sibling_at_offset(-1) unless at_top?
-#       end
-
-#       ##
-#       # Move this node one position down
-#       #
-#       # @return [undefined]
-#       def move_down
-#         switch_with_sibling_at_offset(1) unless at_bottom?
-#       end
-
-#       ##
-#       # Move this node above the specified node
-#       #
-#       # This method changes the node's parent if nescessary.
-#       #
-#       # @param [Mongoid::Tree] other document to move this document above
-#       #
-#       # @return [undefined]
-#       def move_above(other)
-#         ensure_to_be_sibling_of(other)
-
-#         if position > other.position
-#           new_position = other.position
-#           self.siblings_between(other).inc(:position, 1)
-#           other.inc(:position, 1)
-#         else
-#           new_position = other.position - 1
-#           self.siblings_between(other).inc(:position, -1)
-#         end
-
-#         self.position = new_position
-#         save!
-#       end
-
-#       ##
-#       # Move this node below the specified node
-#       #
-#       # This method changes the node's parent if nescessary.
-#       #
-#       # @param [Mongoid::Tree] other document to move this document below
-#       #
-#       # @return [undefined]
-#       def move_below(other)
-#         ensure_to_be_sibling_of(other)
-
-#         if position > other.position
-#           new_position = other.position + 1
-#           self.siblings_between(other).inc(:position, 1)
-#         else
-#           new_position = other.position
-#           self.siblings_between(other).inc(:position, -1)
-#           other.inc(:position, -1)
-#         end
-
-#         self.position = new_position
-#         save!
-#       end
-
-# # END TODO: FIX THESE TO USE NV/DV

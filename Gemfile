@@ -1,6 +1,7 @@
 source 'https://rubygems.org'
 
-gem 'mongoid'
+gem 'mongoid', ['<= 4.0', '>= 3.0']
+gem 'rational_number'
 
 group :development do
   gem 'rake'

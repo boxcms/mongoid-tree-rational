@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Leif Ringstad", "Benedikt Deicke"]
-  s.date = "2013-05-03"
+  s.date = "2013-09-30"
   s.description = "A tree structure for Mongoid documents using the materialized path pattern and rational number sorting."
   s.email = "leifcr@gmail.com"
   s.extra_rdoc_files = [
@@ -27,9 +27,12 @@ Gem::Specification.new do |s|
     "VERSION",
     "lib/mongoid/tree.rb",
     "lib/mongoid/tree/ordering.rb",
+    "lib/mongoid/tree/rational_number.rb",
+    "lib/mongoid/tree/rational_numbering.rb",
     "lib/mongoid/tree/traversal.rb",
-    "mongoid-tree.gemspec",
+    "mongoid-tree-rational.gemspec",
     "spec/mongoid/tree/ordering_spec.rb",
+    "spec/mongoid/tree/rational_ordering_spec.rb",
     "spec/mongoid/tree/traversal_spec.rb",
     "spec/mongoid/tree_spec.rb",
     "spec/spec_helper.rb",
@@ -46,7 +49,8 @@ Gem::Specification.new do |s|
     s.specification_version = 3
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
-      s.add_runtime_dependency(%q<mongoid>, [">= 0"])
+      s.add_runtime_dependency(%q<mongoid>, ["<= 4.0", ">= 3.0"])
+      s.add_runtime_dependency(%q<rational_number>, [">= 0"])
       s.add_development_dependency(%q<rake>, [">= 0"])
       s.add_development_dependency(%q<rspec>, [">= 0"])
       s.add_development_dependency(%q<yard>, [">= 0"])
@@ -55,8 +59,12 @@ Gem::Specification.new do |s|
       s.add_development_dependency(%q<rb-inotify>, [">= 0"])
       s.add_development_dependency(%q<rb-fsevent>, [">= 0"])
       s.add_development_dependency(%q<wdm>, [">= 0"])
+      s.add_development_dependency(%q<hirb>, [">= 0"])
+      s.add_development_dependency(%q<wirble>, [">= 0"])
+      s.add_development_dependency(%q<awesome_print>, [">= 0"])
     else
-      s.add_dependency(%q<mongoid>, [">= 0"])
+      s.add_dependency(%q<mongoid>, ["<= 4.0", ">= 3.0"])
+      s.add_dependency(%q<rational_number>, [">= 0"])
       s.add_dependency(%q<rake>, [">= 0"])
       s.add_dependency(%q<rspec>, [">= 0"])
       s.add_dependency(%q<yard>, [">= 0"])
@@ -65,9 +73,13 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<rb-inotify>, [">= 0"])
       s.add_dependency(%q<rb-fsevent>, [">= 0"])
       s.add_dependency(%q<wdm>, [">= 0"])
+      s.add_dependency(%q<hirb>, [">= 0"])
+      s.add_dependency(%q<wirble>, [">= 0"])
+      s.add_dependency(%q<awesome_print>, [">= 0"])
     end
   else
-    s.add_dependency(%q<mongoid>, [">= 0"])
+    s.add_dependency(%q<mongoid>, ["<= 4.0", ">= 3.0"])
+    s.add_dependency(%q<rational_number>, [">= 0"])
     s.add_dependency(%q<rake>, [">= 0"])
     s.add_dependency(%q<rspec>, [">= 0"])
     s.add_dependency(%q<yard>, [">= 0"])
@@ -76,6 +88,9 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<rb-inotify>, [">= 0"])
     s.add_dependency(%q<rb-fsevent>, [">= 0"])
     s.add_dependency(%q<wdm>, [">= 0"])
+    s.add_dependency(%q<hirb>, [">= 0"])
+    s.add_dependency(%q<wirble>, [">= 0"])
+    s.add_dependency(%q<awesome_print>, [">= 0"])
   end
 end
 

@@ -428,7 +428,6 @@ module Mongoid
       else
         self.parent_ids = []
       end
-
       rearrange_children! if self.parent_ids_changed?
     end
 
