@@ -632,32 +632,48 @@ describe Mongoid::Tree::RationalNumbering do
     end
   end
 
-  it "should rekey the entire tree" do
-    setup_tree <<-ENDTREE
-      - node_1
-      - node_2:
-        - node_2_1
-        - node_2_2
-        - node_2_3
-        - node_2_4:
-          - node_2_4_1
-          - node_2_4_2
-          - node_2_4_3
-    ENDTREE
+  describe "when rekeying" do
+    before(:each) do
+      setup_tree <<-ENDTREE
+        - node_1
+        - node_2:
+          - node_2_1
+          - node_2_2
+          - node_2_3
+          - node_2_4:
+            - node_2_4_1
+            - node_2_4_2
+            - node_2_4_3
+        - node_3
+      ENDTREE
+    end
+    it "should rekey the entire tree" do
+      # Force two gaps in the order
+      node_3 = node(:node_3)
+      node_3.move_to_position(8, {:force => true})
+      node_3.save_with_force_rational_numbers!
+      expect(node(:node_3).rational_number).to      eq(RationalNumber.new(8,1))
 
-    RationalNumberedNode.rekey_all!
+      node_2 = node(:node_2)
+      node_2.move_to_position(4, {:force => true})
+      node_2.save_with_force_rational_numbers!
+      expect(node(:node_2).rational_number).to      eq(RationalNumber.new(4,1))
 
-    # all nodes should still have their respective positions
+      RationalNumberedNode.rekey_all!
 
-    expect(node(:node_1).rational_number).to      eq(RationalNumber.new(1,1))
-    expect(node(:node_2).rational_number).to      eq(RationalNumber.new(2,1))
-    expect(node(:node_2_1).rational_number).to    eq(RationalNumber.new(5,2))
-    expect(node(:node_2_2).rational_number).to    eq(RationalNumber.new(8,3))
-    expect(node(:node_2_3).rational_number).to    eq(RationalNumber.new(11,4))
-    expect(node(:node_2_4).rational_number).to    eq(RationalNumber.new(14,5))
-    expect(node(:node_2_4_1).rational_number).to  eq(RationalNumber.new(31,11))
-    expect(node(:node_2_4_2).rational_number).to  eq(RationalNumber.new(48,17))
-    expect(node(:node_2_4_3).rational_number).to  eq(RationalNumber.new(65,23))
+      # all nodes should still have their respective positions
+
+      expect(node(:node_1).rational_number).to      eq(RationalNumber.new(1,1))
+      expect(node(:node_2).rational_number).to      eq(RationalNumber.new(2,1))
+      expect(node(:node_3).rational_number).to      eq(RationalNumber.new(3,1))
+      expect(node(:node_2_1).rational_number).to    eq(RationalNumber.new(5,2))
+      expect(node(:node_2_2).rational_number).to    eq(RationalNumber.new(8,3))
+      expect(node(:node_2_3).rational_number).to    eq(RationalNumber.new(11,4))
+      expect(node(:node_2_4).rational_number).to    eq(RationalNumber.new(14,5))
+      expect(node(:node_2_4_1).rational_number).to  eq(RationalNumber.new(31,11))
+      expect(node(:node_2_4_2).rational_number).to  eq(RationalNumber.new(48,17))
+      expect(node(:node_2_4_3).rational_number).to  eq(RationalNumber.new(65,23))
+    end
   end
 
   describe "testing validations" do
