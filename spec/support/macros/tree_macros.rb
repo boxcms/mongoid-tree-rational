@@ -20,6 +20,15 @@ module Mongoid::Tree::TreeMacros
     node.children.each { |c| print_tree(c, inspect, depth + 1) }
   end
 
+  def print_rational_tree(node, inspect = false, depth = 0)
+    print '  ' * depth
+    print '- ' unless depth == 0
+    print "#{node.name}  - pos: #{node.position} nv/dv: #{node.rational_number_nv}/#{node.rational_number_dv} snv/dnv: #{node.rational_number_snv}/#{node.rational_number_sdv}"
+    print " (#{node.inspect})" if inspect
+    print "\n"
+    node.children.each { |c| print_rational_tree(c, inspect, depth + 1) }
+  end
+
 private
   def create_tree(object)
     case object

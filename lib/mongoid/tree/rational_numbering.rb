@@ -70,7 +70,7 @@ module Mongoid
             new_rational = root_rational.child_from_position(_pos)
             if new_rational != self.rational_number
               root.move_to_rational_number(new_rational.nv, new_rational.dv, {:force => true})
-              root.save!
+              root.save_with_force_rational_numbers!
               # root.reload # Should caller be responsible for reloading?
             end
             #root.rekey_children
@@ -87,8 +87,8 @@ module Mongoid
       # @return [undefined]
       #
       def initialize(*args)
+        @_forced_rational_number = false
         super
-        rational_number({:force => true})
       end
 
       ##
@@ -135,18 +135,8 @@ module Mongoid
       # @return [undefined]
       #
       def move_to_position(_position, opts = {})
-       # puts "move_to_position #{self.name} #{_position} #{opts[:force].inspect}"
-        # get rational number from position from "parent"
         new_rational_number = parent_rational_number.child_from_position(_position)
-
-        move_conflicting_nodes(new_rational_number.nv, new_rational_number.dv) if (!opts[:force])
-
-        # shouldn't be any conflicting sibling now...
-        self.from_rational_number(new_rational_number)
-
-        if (!!opts[:force])
-         # puts "forcefully move #{self.name} to position #{_position} nv: #{new_rational_number.nv} dv :#{new_rational_number.dv}"
-        end
+        move_to_rational_number(new_rational_number.nv, new_rational_number.dv, opts)
       end
 
       ##
@@ -163,17 +153,11 @@ module Mongoid
       # @return [undefined]
       #
       def move_to_rational_number(nv, dv, opts = {})
-       # puts "move_to_rational_number #{self.name} #{nv}/#{dv} #{opts[:force].inspect}"
-
         # don't check for conflict if forced move
-        move_conflicting_nodes(nv,dv) if (!opts[:force])
+        move_conflicting_nodes(nv,dv) unless !!opts[:force]
 
         # shouldn't be any conflicting sibling now...
         self.from_rational_number(RationalNumber.new(nv,dv))
-
-        if (!!opts[:force])
-         # puts "forcefully move #{self.name} to  #{nv}/#{dv} position :#{self.position}# puts #{self.rational_number.inspect}"
-        end
       end
 
       ##
@@ -186,7 +170,6 @@ module Mongoid
       def move_conflicting_nodes(nv,dv)
         conflicting_sibling = base_class.where(:rational_number_nv => nv).where(:rational_number_dv => dv).excludes(:id => self.id).first
         if (conflicting_sibling != nil)
-         # puts "move conflicting node #{conflicting_sibling.name} from #{nv}/#{dv}"
           self.disable_timestamp_callback()
           # find nv/dv to the right of conflict and move
           next_key = conflicting_sibling.rational_number.next_sibling
@@ -233,7 +216,7 @@ module Mongoid
       # Check if children needs to be rekeyed
       #
       def rekey_children?
-        self.children? && (self.previous_changes.include?("rational_number_nv") || self.previous_changes.include?("parent_ids"))
+        persisted? && self.children? && ( self.previous_changes.include?("rational_number_nv") || self.previous_changes.include?("parent_ids") || self.changes.include?("rational_number_nv") || self.changes.include?("parent_ids") )
       end
 
       ##
@@ -253,11 +236,10 @@ module Mongoid
       end
 
       def rekey_former_siblings?
-        self.previous_changes.include?("parent_id")
+        persisted? && self.previous_changes.include?("parent_id")
       end
 
       def rekey_former_siblings
-       # puts "rekey_former_siblings"
         former_siblings = base_class.where(:parent_id => attribute_was('parent_id')).
                                      and(:rational_number_value.gt => (attribute_was('rational_number_value') || 0)).
                                      excludes(:id => self.id)
@@ -270,7 +252,7 @@ module Mongoid
       def move_node_and_save_if_changed(node, new_rational_number)
         if new_rational_number != node.rational_number
           node.move_to_rational_number(new_rational_number.nv, new_rational_number.dv, {:force => true})
-          node.save!
+          node.save_with_force_rational_numbers!
           # node.reload # Should caller be responsible for reloading?
         end
       end
@@ -374,10 +356,11 @@ module Mongoid
       end
 
       ##
-      # Return the siblings between this and other + other IF other has a higher position
+      # Return the siblings between this and other + other
       #
       def siblings_between_including_other(other)
-        self.siblings.where(:rational_number_value.gt => self.rational_number_value, :rational_number_value.lte => other.rational_number_value)
+        range = [self.rational_number_value, other.rational_number_value].sort
+        self.siblings.where(:rational_number_value.gte => range.first, :rational_number_value.lte => range.last)
       end
 
       ##
@@ -436,7 +419,7 @@ module Mongoid
       # @return [undefined]
       def move_up
         unless at_top?
-          prev_sibling = higher_siblings.first
+          prev_sibling = higher_siblings.last
           switch_with_sibling(prev_sibling) unless prev_sibling.nil?
         end
       end
@@ -453,6 +436,27 @@ module Mongoid
       end
 
       ##
+      # Shift nodes between self and other (or including other) in one or the other direction
+      #
+      # @param [Mongoid::Tree] other document to move this document above
+      # @param [Integer] +1 / -1 for the direction to shift nodes
+      # @param [Boolean] exclude the other object in the shift or not.
+      #
+      #
+      def shift_siblings_between_nodes_position(other, direction, exclude_other = false)
+        if exclude_other
+          nodes_to_shift = siblings_between(other)
+        else
+          nodes_to_shift = siblings_between_including_other(other)
+        end
+        nodes_to_shift.each do |node_to_shift|
+          pos = node_to_shift.position + direction
+          node_to_shift.move_to_position(pos, {:force => true})
+          node_to_shift.save_with_force_rational_numbers!
+        end
+      end
+
+      ##
       # Move this node above the specified node
       #
       # This method changes the node's parent if nescessary.
@@ -462,12 +466,16 @@ module Mongoid
       # @return [undefined]
       def move_above(other)
         ensure_to_be_sibling_of(other)
-        move_to_rational_number(other.rational_number_nv, other.rational_number_dv)
+        return if other.position == self.position + 1
+        # If there are nodes between this and other before move, make sure they are shifted upwards before moving
+        _direction = (self.position > other.position ? 1 : -1)
+        _position = (_direction < 0 ? other.position + _direction : other.position)
+        shift_siblings_between_nodes_position(other, _direction, (_direction > 0 ? false : true))
+
+        # There should not be conflicting nodes at this stage.
+        move_to_position(_position)
         save!
       end
-
-# TODO: MAKE GENERAL FUNCTION THAT SHIFTS ALL OBJECTS IN THE DIRECTION NEEDED TO INSERT THE
-# node at the needed position for move above/below
 
       ##
       # Move this node below the specified node
@@ -478,22 +486,14 @@ module Mongoid
       #
       # @return [undefined]
       def move_below(other)
-       # puts "move_below #{self.name} below #{other.name}"
         ensure_to_be_sibling_of(other)
-       # puts "Position of other: #{other.position}"
-       # puts "Position of self: #{self.position}"
-        # If there are nodes between this and other before move, make sure they are shifted upwards before moving
-        unless self.at_bottom?
-          pos = self.position
-          nodes_to_shift = self.siblings_between_including_other(other)
-          nodes_to_shift.each do |between_sibling|
-           # puts "moving between_sibling #{between_sibling.name} to #{pos}"
-            between_sibling.move_to_position(pos, {:force => true})
-            between_sibling.save!
-            pos += 1
-          end
-        end
-        move_to_position(other.position)
+        return if other.position + 1 == self.position
+
+        _direction = (self.position > other.position ? 1 : -1)
+        _position = (_direction > 0 ? other.position + _direction : other.position)
+        shift_siblings_between_nodes_position(other, _direction, (_direction > 0 ? true : false))
+
+        move_to_position(_position)
         save!
       end
 
@@ -536,7 +536,6 @@ module Mongoid
       # @return [undefined]
       #
       def update_rational_number
-        ## puts "-- update_rational_number -- #{self.name} #{"nv: "+self.rational_number_nv.to_s if self.rational_number_nv_changed?} #{"dv: "+self.rational_number_dv.to_s if self.rational_number_dv_changed?} #{"parent" if self.parent_id_changed?} #{"initial nil" if set_initial_rational_number?}"
         if self.rational_number_nv_changed? && self.rational_number_dv_changed? && !self.rational_number_value.nil?
           self.move_to_rational_number(self.rational_number_nv, self.rational_number_dv)
         elsif self.parent_id_changed? || set_initial_rational_number?
@@ -553,7 +552,6 @@ module Mongoid
 
           self.move_to_rational_number(new_rational_number.nv, new_rational_number.dv)
         end
-       # puts "updated #{self.name} position to value: nv:#{self.rational_number_nv} dv:#{self.rational_number_dv} position:#{self.position}"
       end
 
       ##
@@ -574,8 +572,7 @@ module Mongoid
       # @return true if it should be updated, else false
       #
       def update_rational_number?
-        ## puts "#{self.name} changes: #{self.changes}"
-        set_initial_rational_number? || self.parent_id_changed? || (self.rational_number_nv_changed? && self.rational_number_dv_changed?)
+        (set_initial_rational_number? || self.parent_id_changed? || (self.rational_number_nv_changed? && self.rational_number_dv_changed?)) && !self.forced_rational_number?
       end
 
       ##
@@ -583,6 +580,19 @@ module Mongoid
       #
       def set_initial_rational_number?
         self.rational_number_value.nil?
+      end
+
+      ##
+      # Was the changed forced?
+      #
+      def forced_rational_number?
+        @_forced_rational_number
+      end
+
+      def save_with_force_rational_numbers!
+        @_forced_rational_number = true
+        self.save!
+        @_forced_rational_number = false
       end
 
     private
@@ -596,10 +606,12 @@ module Mongoid
       # @return [undefined]
       #
       def switch_with_sibling(sibling)
-        sibling.move_to_rational_number(self.rational_number_nv, self.rational_number_dv, {:force => true})
-        self.move_to_rational_number(sibling.rational_number_nv, sibling.rational_number_dv, {:force => true})
-        sibling.save!
-        save!
+        self_pos = self.position
+        sibling_pos = sibling.position
+        sibling.move_to_position(self_pos, {:force => true})
+        self.move_to_position(sibling_pos, {:force => true})
+        sibling.save_with_force_rational_numbers!
+        self.save_with_force_rational_numbers!
       end
 
       ##
@@ -619,7 +631,6 @@ module Mongoid
       # FIX THESE SHIT CASE FUCK!
 
       def move_lower_siblings
-        ## puts "Moving lower siblings"
         lower_siblings.each do |sibling|
           disable_timestamp_callback
           sibling.move_to_position(sibling.position - 1)
