@@ -16,3 +16,8 @@ group :development do
   gem 'wirble'
   gem 'awesome_print'
 end
+
+group :development, :test do
+  gem 'coveralls', :require => false
+  gem 'simplecov', :require => false
+end

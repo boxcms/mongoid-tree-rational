@@ -1,4 +1,5 @@
-# mongoid-tree [![Build Status](https://secure.travis-ci.org/boxcms/mongoid-tree-rational.png?branch=master)](http://travis-ci.org/boxcms/mongoid-tree-rational) [![Dependency Status](https://gemnasium.com/boxcms/mongoid-tree-rational.png)](http://gemnasium.com/boxcms/mongoid-tree-rational)
+# mongoid-tree [![Build Status](https://secure.travis-ci.org/boxcms/mongoid-tree-rational.png?branch=master)](https://travis-ci.org/boxcms/mongoid-tree-rational) [![Dependency Status](https://gemnasium.com/boxcms/mongoid-tree-rational.png)](https://gemnasium.com/boxcms/mongoid-tree-rational) [![Coverage Status](https://coveralls.io/repos/boxcms/mongoid-tree-rational/badge.png)](https://coveralls.io/r/boxcms/mongoid-tree-rational)
+
 
 A tree structure for Mongoid documents using the materialized path pattern
 

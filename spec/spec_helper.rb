@@ -6,6 +6,16 @@ require 'mongoid/tree'
 
 require 'rspec'
 
+if ENV['TRAVIS']
+  require 'coveralls'
+  Coveralls.wear!
+elsif ENV['COVERAGE'] && RUBY_VERSION > "1.8"
+  require 'simplecov'
+  SimpleCov.start do
+    add_filter 'spec'
+  end
+end
+
 Mongoid.configure do |config|
   config.connect_to('mongoid_tree_test')
 end
