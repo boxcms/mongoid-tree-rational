@@ -602,6 +602,74 @@ describe Mongoid::Tree::RationalNumbering do
         expect(node(:node_2).children).to eq([node(:node_2_1), node(:node_2_2), node(:node_2_4), node(:node_2_3)])
       end
     end
-  end # moving nodes around
+  end # moving nodes with small tree
+
+  describe "querying the tree" do
+    before(:each) do
+      setup_tree <<-ENDTREE
+        - node_1:
+          - node_1_1
+          - node_1_2:
+            - node_1_2_1:
+              - node_1_2_1_1
+              - node_1_2_1_2
+            - node_1_2_2:
+              - node_1_2_2_1
+        - node_2:
+          - node_2_1
+            - node_2_1_1
+        - node_3:
+          - node_3_1
+          - node_3_2
+      ENDTREE
+    end
+    it "should get the tree under the given node" do
+      expect(node(:node_3).tree.all).to eq([node(:node_3_1), node(:node_3_2)])
+      expect(node(:node_1).tree.all).to eq([node(:node_1_1), node(:node_1_2), node(:node_1_2_1), node(:node_1_2_1_1), node(:node_1_2_1_2), node(:node_1_2_2), node(:node_1_2_2_1)])
+
+      expect(node(:node_3).tree_and_self.all).to eq([node(:node_3), node(:node_3_1), node(:node_3_2)])
+      expect(node(:node_1).tree_and_self.all).to eq([node(:node_1), node(:node_1_1), node(:node_1_2), node(:node_1_2_1), node(:node_1_2_1_1), node(:node_1_2_1_2), node(:node_1_2_2), node(:node_1_2_2_1)])
+    end
+  end
+
+  it "should rekey the entire tree" do
+    setup_tree <<-ENDTREE
+      - node_1
+      - node_2:
+        - node_2_1
+        - node_2_2
+        - node_2_3
+        - node_2_4:
+          - node_2_4_1
+          - node_2_4_2
+          - node_2_4_3
+    ENDTREE
+
+    RationalNumberedNode.rekey_all!
+
+    # all nodes should still have their respective positions
+
+    expect(node(:node_1).rational_number).to      eq(RationalNumber.new(1,1))
+    expect(node(:node_2).rational_number).to      eq(RationalNumber.new(2,1))
+    expect(node(:node_2_1).rational_number).to    eq(RationalNumber.new(5,2))
+    expect(node(:node_2_2).rational_number).to    eq(RationalNumber.new(8,3))
+    expect(node(:node_2_3).rational_number).to    eq(RationalNumber.new(11,4))
+    expect(node(:node_2_4).rational_number).to    eq(RationalNumber.new(14,5))
+    expect(node(:node_2_4_1).rational_number).to  eq(RationalNumber.new(31,11))
+    expect(node(:node_2_4_2).rational_number).to  eq(RationalNumber.new(48,17))
+    expect(node(:node_2_4_3).rational_number).to  eq(RationalNumber.new(65,23))
+  end
+
+  describe "testing validations" do
+    pending "Should fail validation when trying to set invalid nv/dv" do
+    end
+
+    pending "Should fail validation when trying to set invalid nv/dv" do
+    end
+
+    pending "Should fail validation when trying to move nv/dv to an invalid value" do
+    end
+
+  end
 
 end # Mongoid::Tree::RationalNumbering

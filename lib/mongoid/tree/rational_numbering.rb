@@ -68,12 +68,12 @@ module Mongoid
           root_rational = RationalNumber.new
           self.roots.each do |root|
             new_rational = root_rational.child_from_position(_pos)
-            if new_rational != self.rational_number
+            if new_rational != root.rational_number
               root.move_to_rational_number(new_rational.nv, new_rational.dv, {:force => true})
               root.save_with_force_rational_numbers!
               # root.reload # Should caller be responsible for reloading?
             end
-            #root.rekey_children
+            root.rekey_children
             _pos += 1
           end
         end
@@ -293,7 +293,7 @@ module Mongoid
       #
       # @return [RationalNumber] The rational number for this node
       #
-      def rational_number(opts = {})
+      def rational_number
         RationalNumber.new(self.rational_number_nv, self.rational_number_dv, self.rational_number_snv, self.rational_number_sdv)
       end
 
@@ -589,10 +589,33 @@ module Mongoid
         @_forced_rational_number
       end
 
+      ##
+      # save when forcing rational numbers
+      #
       def save_with_force_rational_numbers!
         @_forced_rational_number = true
         self.save!
         @_forced_rational_number = false
+      end
+
+      ##
+      # Get the tree under the given node
+      #
+      def tree
+        low_rational_number  = self.rational_number_value
+        high_rational_number = self.rational_number.parent.child_from_position(self.position+1).number
+
+        base_class.where(:rational_number_value.gt => low_rational_number, :rational_number_value.lt => high_rational_number)
+      end
+
+      ##
+      # Get the tree under the given node
+      #
+      def tree_and_self
+        low_rational_number  = self.rational_number_value
+        high_rational_number = self.rational_number.parent.child_from_position(self.position+1).number
+
+        base_class.where(:rational_number_value.gte => low_rational_number, :rational_number_value.lt => high_rational_number)
       end
 
     private

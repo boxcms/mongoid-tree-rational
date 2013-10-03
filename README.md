@@ -1,7 +1,6 @@
 # mongoid-tree [![Build Status](https://secure.travis-ci.org/boxcms/mongoid-tree-rational.png?branch=master)](https://travis-ci.org/boxcms/mongoid-tree-rational) [![Dependency Status](https://gemnasium.com/boxcms/mongoid-tree-rational.png)](https://gemnasium.com/boxcms/mongoid-tree-rational) [![Coverage Status](https://coveralls.io/repos/boxcms/mongoid-tree-rational/badge.png)](https://coveralls.io/r/boxcms/mongoid-tree-rational)
 
-
-A tree structure for Mongoid documents using the materialized path pattern
+A tree structure for Mongoid documents using rational numbers and materialized path pattern
 
 ## Requirements
 
@@ -13,25 +12,24 @@ This version will only support mongoid 3.0+
 
 To install mongoid_tree_rational, simply add it to your Gemfile:
 
-    gem 'mongoid-tree-rational', :require => 'mongoid/tree-rational'
+    gem 'mongoid-tree-rational', :require => 'mongoid/tree'
 
 In order to get the latest development version of mongoid-tree:
 
-    gem 'mongoid-tree-rational', :git => 'git://github.com/boxcms/mongoid-tree-rational', :require => 'mongoid/tree-rational'
+    gem 'mongoid-tree-rational', :git => 'git://github.com/boxcms/mongoid-tree-rational', :require => 'mongoid/tree'
 
-You might want to remove the `:require => 'mongoid/tree-rational'` option and explicitly `require 'mongoid/tree-rational'` where needed and finally run
+You might want to remove the `:require => 'mongoid/tree'` option and explicitly `require 'mongoid/tree'` where needed and finally run
 
     bundle install
 
 
 ## Usage
 
-Read the API documentation at http://boxcms.github.com/mongoid-tree-rational and take a look at the `Mongoid::Tree` module
-
 ```ruby
 class Node
   include Mongoid::Document
   include Mongoid::Tree
+  include Mongoid::Tree::RationalNumbering
 end
 ```
 
@@ -72,7 +70,82 @@ See `Mongoid::Tree` for more information on these methods.
 
 ### Ordering
 
-`Mongoid::Tree` doesn't order children by default. To enable ordering of tree nodes include the `Mongoid::Tree::Ordering` module. This will add a `position` field to your document and provide additional utility methods:
+`Mongoid::Tree` doesn't order children by default. To enable ordering of tree nodes include the `Mongoid::Tree::RationalNumbering` or the `Mongoid::Tree::Ordering` module.
+
+
+#### By rational numbers
+
+To use rational ordering, include the `Mongoid::Tree::RationalNumbering` module. This will add a `position` field to your document and provide additional utility methods:
+
+While rational numbering requires more processing when saving, it does give the benefit of querying an entire tree in one go.
+
+
+Mathematical details about rational numbers in nested trees can be found here: [http://arxiv.org/pdf/0806.3115v1.pdf](http://arxiv.org/pdf/0806.3115v1.pdf)
+
+
+```ruby
+node.lower_siblings
+node.higher_siblings
+node.first_sibling_in_list
+node.last_sibling_in_list
+node.siblings_between(other_node)
+
+node.tree # get the entire tree under the node (Triggers 1 query only! Hurray)
+node.tree_and_self # # get the entire tree under the node including node
+
+node.move_up
+node.move_down
+node.move_to_top
+node.move_to_bottom
+node.move_above(other)
+node.move_below(other)
+
+node.at_top?
+node.at_bottom?
+```
+
+Example:
+
+```ruby
+class Node
+  include Mongoid::Document
+  include Mongoid::Tree
+  include Mongoid::Tree::RationalNumbering
+end
+```
+
+There are one additional class function
+```ruby
+Node.rekey_all! # Will iterate over the entire tree and rekey every single node.
+                # Please note that this might take a while for a large tree.
+                # Do this in a background worker or rake task.
+end
+```
+
+You can get the entire tree in one go like this:
+
+```ruby
+# - node_1
+#    - node_1_1
+#    - node_1_2
+# - node_2
+#   - node_2_1
+#     - node_2_1_1
+#     - node_2_1_2
+#   - node_2_2
+#     - node_2_2_1
+#     - node_2_2_2
+
+Node.all  # Get the entire tree
+# -> [node_1, node_1_1, node_1_2, node_2, node_2_1, node_2_1_1, node_2_1_2, node_2_2, node_2_2_1, node_2_2_2]
+end
+```
+
+See `Mongoid::Tree::RationalNumbering` for more information on these methods.
+
+#### By 0-based integer (simple)
+
+To use simple ordering, include the `Mongoid::Tree::Ordering` module. This will add a `position` field to your document and provide additional utility methods:
 
 ```ruby
 node.lower_siblings
@@ -196,10 +269,6 @@ See [github.com/boxcms/mongoid-tree-rational/issues](https://github.com/boxcms/m
 
 See [github.com/boxcms/mongoid-tree-rational](https://github.com/boxcms/mongoid-tree-rational) and feel free to fork it!
 
-
-## Rational Numbers
-
-Details about rational numbers in nested trees can be found here: [http://arxiv.org/pdf/0806.3115v1.pdf](http://arxiv.org/pdf/0806.3115v1.pdf)
 
 ## MongoMapper version
 
