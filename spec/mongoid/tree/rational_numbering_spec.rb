@@ -294,8 +294,6 @@ describe Mongoid::Tree::RationalNumbering do
     end
   end
 
-
-
   describe 'moving nodes with large tree' do
     before(:each) do
       setup_tree <<-ENDTREE
@@ -511,6 +509,48 @@ describe Mongoid::Tree::RationalNumbering do
         - node_3
       ENDTREE
     end
+
+    # THIS IS NOT IMPLEMENTED, as it should NOT be used this way
+    # describe "setting position or nv/dv values directly" do
+    #   it "should move conflicting nodes and their children when using attribs to set nv/dv (first test)" do
+    #     node_2_1 = node(:node_2_1)
+    #     node_2_1.rational_number_nv = 2
+    #     node_2_1.rational_number_dv = 1
+    #     node_2_1.save!
+    #     expect(node(:node_2_1).rational_number).to eq(RationalNumber.new(2,1))
+    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(3,1))
+    #     expect(node(:node_2_2).rational_number).to eq(RationalNumber.new(7,))
+    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(4,1))
+    #   end
+
+    #   it "should move conflicting nodes and their children when using attribs to set nv/dv (second test)" do
+    #     node_2_1 = node(:node_2_1)
+    #     node_2_1.rational_number_nv = 1
+    #     node_2_1.rational_number_dv = 1
+    #     node_2_1.save!
+    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
+    #     expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
+    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
+    #   end
+
+    #   it "should move conflicting nodes and their children when setting position" do
+    #     node_2 = node(:node_2)
+    #     node_2.move_to_position(1)
+    #     node_2.save!
+    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
+    #     expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
+    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
+    #   end
+
+    #   it "should move conflicting nodes and their children when setting nv/dv trough function" do
+    #     node_2 = node(:node_2)
+    #     node_2.move_to_rational_number(1,1)
+    #     node_2.save!
+    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
+    #     expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
+    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
+    #   end
+    # end
 
     describe "#move_to_top" do
       it "should return true when attempting to move the first sibling" do

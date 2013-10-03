@@ -1,5 +1,7 @@
 I18n.load_path << File.expand_path('../../locale/en.yml', __FILE__)
 
+# TODO: ADD VALIDATIONS!
+
 require 'rational_number'
 
 module Mongoid
@@ -107,24 +109,7 @@ module Mongoid
 
       ##
       #
-      # Force update of the rational number on the document
-      #
-      # @param  [Hash] Options
-      #
-      # Options can be:
-      #
-      # :force => force an update on the rational number
-      # :position => force position for the rational number
-      #
-      # @return [undefined]
-      #
-      def update_rational_number!(opts = {})
-        update_rational_number({:force => true}.merge(opts))
-      end
-
-      ##
-      #
-      # Move the document to a given position (integer based, starting with 1)
+      # [INTERNAL] Move the document to a given position (integer based, starting with 1)
       #
       # if a document exists on the new position, all siblings are shifted right before moving this document
       # can move without updating conflicting siblings by using :force in options
@@ -141,7 +126,7 @@ module Mongoid
 
       ##
       #
-      # Move the document to a given rational_number position
+      # [INTERNAL] Move the document to a given rational_number position
       #
       # if a document exists on the new position, all siblings are shifted right before moving this document
       # can move without updating conflicting siblings by using :ignore_conflicts in options
@@ -536,9 +521,7 @@ module Mongoid
       # @return [undefined]
       #
       def update_rational_number
-        if self.rational_number_nv_changed? && self.rational_number_dv_changed? && !self.rational_number_value.nil?
-          self.move_to_rational_number(self.rational_number_nv, self.rational_number_dv)
-        elsif self.parent_id_changed? || set_initial_rational_number?
+        if self.parent_id_changed? || set_initial_rational_number?
           # only changed parent, needs to find next free position
           # Get rational number from new parent
 
@@ -572,7 +555,7 @@ module Mongoid
       # @return true if it should be updated, else false
       #
       def update_rational_number?
-        (set_initial_rational_number? || self.parent_id_changed? || (self.rational_number_nv_changed? && self.rational_number_dv_changed?)) && !self.forced_rational_number?
+        (set_initial_rational_number? || self.parent_id_changed?) && !self.forced_rational_number?
       end
 
       ##
