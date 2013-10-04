@@ -84,6 +84,8 @@ Mathematical details about rational numbers in nested trees can be found here: [
 
 
 ```ruby
+node.set_rational_number(nv,dv) # set the nv/dv directly if you have the values
+                                # returns true/false + errors if any.
 node.lower_siblings
 node.higher_siblings
 node.first_sibling_in_list
