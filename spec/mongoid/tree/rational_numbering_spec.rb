@@ -296,6 +296,20 @@ describe Mongoid::Tree::RationalNumbering do
 
   describe 'moving nodes with large tree' do
     before(:each) do
+
+  #     setup_tree <<-ENDTREE
+  #       - node_1:
+  #         - node_1_1:
+  #           - node_1_1_1:
+  #             - node_1_1_1_1
+  #         - node_1_2
+  #         - node_1_3
+  #       - node_2:
+  #         - node_2_1
+  #         - node_2_2
+  #       - node_3
+  #     ENDTREE
+
       setup_tree <<-ENDTREE
         - node_1:
           - node_1_1
@@ -511,46 +525,48 @@ describe Mongoid::Tree::RationalNumbering do
     end
 
     # THIS IS NOT IMPLEMENTED, as it should NOT be used this way
-    # describe "setting position or nv/dv values directly" do
-    #   it "should move conflicting nodes and their children when using attribs to set nv/dv (first test)" do
-    #     node_2_1 = node(:node_2_1)
-    #     node_2_1.rational_number_nv = 2
-    #     node_2_1.rational_number_dv = 1
-    #     node_2_1.save!
-    #     expect(node(:node_2_1).rational_number).to eq(RationalNumber.new(2,1))
-    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(3,1))
-    #     expect(node(:node_2_2).rational_number).to eq(RationalNumber.new(7,))
-    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(4,1))
-    #   end
+    describe "setting position or nv/dv values directly" do
+      it "should move conflicting nodes and their children when using attribs to set nv/dv (first test)" do
+        node_2_1 = node(:node_2_1)
+        node_2_1.rational_number_nv = 2
+        node_2_1.rational_number_dv = 1
+        node_2_1.save!
+        expect(node(:node_1).rational_number).to eq(RationalNumber.new(1,1))
+        expect(node(:node_2_1).rational_number).to eq(RationalNumber.new(2,1))
+        expect(node(:node_2).rational_number).to eq(RationalNumber.new(3,1))
+        expect(node(:node_2_2).rational_number).to eq(RationalNumber.new(7,2))
+        expect(node(:node_3).rational_number).to eq(RationalNumber.new(4,1))
+      end
 
-    #   it "should move conflicting nodes and their children when using attribs to set nv/dv (second test)" do
-    #     node_2_1 = node(:node_2_1)
-    #     node_2_1.rational_number_nv = 1
-    #     node_2_1.rational_number_dv = 1
-    #     node_2_1.save!
-    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
-    #     expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
-    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
-    #   end
+      it "should move conflicting nodes and their children when using attribs to set nv/dv (second test)" do
+        node_2_1 = node(:node_2_1)
+        node_2_1.rational_number_nv = 1
+        node_2_1.rational_number_dv = 1
+        node_2_1.save!
+        expect(node(:node_2_1).rational_number).to eq(RationalNumber.new(1,1))
+        expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
+        expect(node(:node_2).rational_number).to eq(RationalNumber.new(3,1))
+        expect(node(:node_3).rational_number).to eq(RationalNumber.new(4,1))
+      end
 
-    #   it "should move conflicting nodes and their children when setting position" do
-    #     node_2 = node(:node_2)
-    #     node_2.move_to_position(1)
-    #     node_2.save!
-    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
-    #     expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
-    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
-    #   end
+      it "should move conflicting nodes and their children when setting position" do
+        node_2 = node(:node_2)
+        node_2.move_to_position(1)
+        node_2.save!
+        expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
+        expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
+        expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
+      end
 
-    #   it "should move conflicting nodes and their children when setting nv/dv trough function" do
-    #     node_2 = node(:node_2)
-    #     node_2.move_to_rational_number(1,1)
-    #     node_2.save!
-    #     expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
-    #     expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
-    #     expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
-    #   end
-    # end
+      it "should move conflicting nodes and their children when setting nv/dv trough function" do
+        node_2 = node(:node_2)
+        node_2.move_to_rational_number(1,1)
+        node_2.save!
+        expect(node(:node_2).rational_number).to eq(RationalNumber.new(1,1))
+        expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
+        expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
+      end
+    end
 
     describe "#move_to_top" do
       it "should return true when attempting to move the first sibling" do
@@ -656,7 +672,7 @@ describe Mongoid::Tree::RationalNumbering do
             - node_1_2_2:
               - node_1_2_2_1
         - node_2:
-          - node_2_1
+          - node_2_1:
             - node_2_1_1
         - node_3:
           - node_3_1
@@ -664,11 +680,13 @@ describe Mongoid::Tree::RationalNumbering do
       ENDTREE
     end
     it "should get the tree under the given node" do
-      expect(node(:node_3).tree.all).to eq([node(:node_3_1), node(:node_3_2)])
       expect(node(:node_1).tree.all).to eq([node(:node_1_1), node(:node_1_2), node(:node_1_2_1), node(:node_1_2_1_1), node(:node_1_2_1_2), node(:node_1_2_2), node(:node_1_2_2_1)])
+      expect(node(:node_2).tree.all).to eq([node(:node_2_1), node(:node_2_1_1)])
+      expect(node(:node_3).tree.all).to eq([node(:node_3_1), node(:node_3_2)])
 
-      expect(node(:node_3).tree_and_self.all).to eq([node(:node_3), node(:node_3_1), node(:node_3_2)])
       expect(node(:node_1).tree_and_self.all).to eq([node(:node_1), node(:node_1_1), node(:node_1_2), node(:node_1_2_1), node(:node_1_2_1_1), node(:node_1_2_1_2), node(:node_1_2_2), node(:node_1_2_2_1)])
+      expect(node(:node_2).tree_and_self.all).to eq([node(:node_2), node(:node_2_1), node(:node_2_1_1)])
+      expect(node(:node_3).tree_and_self.all).to eq([node(:node_3), node(:node_3_1), node(:node_3_2)])
     end
   end
 
@@ -717,15 +735,31 @@ describe Mongoid::Tree::RationalNumbering do
   end
 
   describe "testing validations" do
-    pending "Should fail validation when trying to set invalid nv/dv" do
+    before(:each) do
+      setup_tree <<-ENDTREE
+        - node_1
+        - node_2:
+          - node_2_1
+        - node_3
+      ENDTREE
     end
 
-    pending "Should fail validation when trying to set invalid nv/dv" do
+    it "should fail validation when trying to set invalid nv/dv (parent not found)" do
+      node_to_move = node(:node_2_1)
+      node_to_move.rational_number_nv = 65
+      node_to_move.rational_number_dv = 23
+      node_to_move.save
+      expect(node_to_move).not_to be_valid
     end
 
-    pending "Should fail validation when trying to move nv/dv to an invalid value" do
+    it "should fail validation when trying to nv/dv resulting in cyclic relation" do
+      node_to_move = node(:node_2)
+      node_to_move.rational_number_nv = 13
+      node_to_move.rational_number_dv = 15
+      node_to_move.save
+      expect(node_to_move).not_to be_valid
     end
 
-  end
+  end # describe "testing validations"
 
 end # Mongoid::Tree::RationalNumbering
