@@ -19,7 +19,7 @@ describe Mongoid::Tree::RationalNumbering do
     expect(f_sdv).not_to be_nil
     expect(f_sdv.options[:type]).to eq(Integer)
     expect(f_value).not_to be_nil
-    expect(f_value.options[:type]).to eq(Float)
+    expect(f_value.options[:type]).to eq(BigDecimal)
   end
 
   it 'should have same numbers as in the paper for rational number in nested sets theory' do

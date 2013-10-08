@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "mongoid-tree-rational"
-  s.version = "0.0.1"
+  s.version = "0.1.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Leif Ringstad", "Benedikt Deicke"]
-  s.date = "2013-09-30"
+  s.date = "2013-10-08"
   s.description = "A tree structure for Mongoid documents using the materialized path pattern and rational number sorting."
   s.email = "leifcr@gmail.com"
   s.extra_rdoc_files = [
@@ -25,14 +25,15 @@ Gem::Specification.new do |s|
     "README.md",
     "Rakefile",
     "VERSION",
+    "lib/mongoid/locale/en.yml",
+    "lib/mongoid/locale/nb.yml",
     "lib/mongoid/tree.rb",
     "lib/mongoid/tree/ordering.rb",
-    "lib/mongoid/tree/rational_number.rb",
     "lib/mongoid/tree/rational_numbering.rb",
     "lib/mongoid/tree/traversal.rb",
     "mongoid-tree-rational.gemspec",
     "spec/mongoid/tree/ordering_spec.rb",
-    "spec/mongoid/tree/rational_ordering_spec.rb",
+    "spec/mongoid/tree/rational_numbering_spec.rb",
     "spec/mongoid/tree/traversal_spec.rb",
     "spec/mongoid/tree_spec.rb",
     "spec/spec_helper.rb",
@@ -62,6 +63,8 @@ Gem::Specification.new do |s|
       s.add_development_dependency(%q<hirb>, [">= 0"])
       s.add_development_dependency(%q<wirble>, [">= 0"])
       s.add_development_dependency(%q<awesome_print>, [">= 0"])
+      s.add_development_dependency(%q<coveralls>, [">= 0"])
+      s.add_development_dependency(%q<simplecov>, [">= 0"])
     else
       s.add_dependency(%q<mongoid>, ["<= 4.0", ">= 3.0"])
       s.add_dependency(%q<rational_number>, [">= 0"])
@@ -76,6 +79,8 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<hirb>, [">= 0"])
       s.add_dependency(%q<wirble>, [">= 0"])
       s.add_dependency(%q<awesome_print>, [">= 0"])
+      s.add_dependency(%q<coveralls>, [">= 0"])
+      s.add_dependency(%q<simplecov>, [">= 0"])
     end
   else
     s.add_dependency(%q<mongoid>, ["<= 4.0", ">= 3.0"])
@@ -91,6 +96,8 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<hirb>, [">= 0"])
     s.add_dependency(%q<wirble>, [">= 0"])
     s.add_dependency(%q<awesome_print>, [">= 0"])
+    s.add_dependency(%q<coveralls>, [">= 0"])
+    s.add_dependency(%q<simplecov>, [">= 0"])
   end
 end
 

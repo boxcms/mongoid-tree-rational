@@ -26,7 +26,7 @@ module Mongoid
         field :rational_number_dv,    :type => Integer, :default => 1
         field :rational_number_snv,   :type => Integer, :default => 1
         field :rational_number_sdv,   :type => Integer, :default => 0
-        field :rational_number_value, :type => Float
+        field :rational_number_value, :type => BigDecimal
 
         validate          :validate_rational_hierarchy
 
