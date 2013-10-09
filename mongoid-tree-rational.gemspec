@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Leif Ringstad", "Benedikt Deicke"]
-  s.date = "2013-10-08"
+  s.date = "2013-10-09"
   s.description = "A tree structure for Mongoid documents using the materialized path pattern and rational number sorting."
   s.email = "leifcr@gmail.com"
   s.extra_rdoc_files = [
