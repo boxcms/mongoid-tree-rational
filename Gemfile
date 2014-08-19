@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'mongoid', ['<= 4.0', '>= 3.0']
+gem 'mongoid', ['<= 5.0', '>= 4.0']
 gem 'rational_number'
 
 group :development do
@@ -23,5 +23,5 @@ group :development, :test do
 end
 
 platforms :rbx do
-  gem 'rubysl', '~> 2.0'
+  gem 'rubysl-rake', '~> 2.0'
 end
