@@ -331,37 +331,6 @@ module Mongoid
       end
 
       ##
-      #
-      # Not needed, as each child gets the rational number updated after updating path?
-      # @return [undefined]
-      #
-      # def children_update_rational_number
-      #   if rearrange_children?
-      #     _position = 0
-      #     # self.disable_timestamp_callback()
-      #     self.children.each do |child|
-      #       child.update_rational_number!(:position => _position)
-      #       _position += 1
-      #     end
-      #     # self.enable_timestamp_callback()
-      #   end
-      # end
-
-      ##
-      # Enable timestamping callback if existing
-      #
-      def enable_timestamp_callback
-
-      end
-
-      ##
-      # Disable timestamping callback if existing
-      #
-      def disable_timestamp_callback
-
-      end
-
-      ##
       # Convert to rational number
       #
       # @return [RationalNumber] The rational number for this node
