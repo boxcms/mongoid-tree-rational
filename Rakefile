@@ -56,8 +56,6 @@ task :default => :spec
 
 desc "Open an irb session"
 task :test_console do
-  require 'wirble'
   require 'ap'
-  require 'hirb'
   sh "irb -rubygems -I lib -r ./spec/spec_helper.rb"
 end
