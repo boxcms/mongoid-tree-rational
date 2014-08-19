@@ -295,7 +295,7 @@ end
 
 ## Build Status
 
-mongoid-tree is on [Travis CI](http://travis-ci.org/boxcms/mongoid-tree-rational) running the specs on Ruby Head, Ruby 1.9.3, JRuby (1.9 mode), and Rubinius (1.9 mode).
+mongoid-tree is on tested on [Travis CI](http://travis-ci.org/boxcms/mongoid-tree-rational) running the specs against ruby 2.0.0, ruby 2.1.2 and rbx-2
 
 ## Known issues
 
