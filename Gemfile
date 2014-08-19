@@ -21,3 +21,7 @@ group :development, :test do
   gem 'coveralls', :require => false
   gem 'simplecov', :require => false
 end
+
+platforms :rbx do
+  gem 'rubysl', '~> 2.0'
+end
