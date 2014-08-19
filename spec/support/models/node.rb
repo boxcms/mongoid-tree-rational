@@ -45,3 +45,26 @@ class RationalNumberedNode
 
   # attr_accessible :name
 end
+
+class RationalNumberedTimestampNode
+  include Mongoid::Document
+  include Mongoid::Tree
+  include Mongoid::Tree::RationalNumbering
+  include Mongoid::Timestamps
+
+  field :name
+
+  # attr_accessible :name
+end
+
+class RationalNumberedTimestampNodeDisabledTimestamp
+  include Mongoid::Document
+  include Mongoid::Tree
+  include Mongoid::Tree::RationalNumbering
+  include Mongoid::Timestamps
+  rational_number_options({ auto_tree_timestamping: false})
+
+  field :name
+
+  # attr_accessible :name
+end

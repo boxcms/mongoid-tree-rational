@@ -3,7 +3,7 @@ en:
     errors:
       messages:
         tree:
-          cyclic: "Can't be children of a descendant"
+          cyclic: "Can't be child of a descendant"
           search_class_mismatch: "Mismatch between search classes. Parent: %{parent_search_class} Node: %{node_search_class}"
           rational:
             incorrect_parent:      "Positional values doesn't match parent (check nv/dv values)"

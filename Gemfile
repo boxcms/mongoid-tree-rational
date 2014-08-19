@@ -12,9 +12,8 @@ group :development do
   gem 'rb-inotify', :require => false
   gem 'rb-fsevent', :require => false
   gem 'wdm', :platforms => [:mswin, :mingw], :require => false
-  gem 'hirb'
-  gem 'wirble'
   gem 'awesome_print'
+  gem 'timecop'
 end
 
 group :development, :test do

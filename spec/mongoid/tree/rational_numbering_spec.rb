@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'timecop'
 
 describe Mongoid::Tree::RationalNumbering do
 
@@ -566,6 +567,16 @@ describe Mongoid::Tree::RationalNumbering do
         expect(node(:node_1).rational_number).to eq(RationalNumber.new(2,1))
         expect(node(:node_3).rational_number).to eq(RationalNumber.new(3,1))
       end
+
+      it "should move conflicting nodes and their children when setting nv/dv trough function" do
+        node_3 = node(:node_3)
+        node_3.move_to_rational_number(5,2)
+        node_3.save!
+        expect(node(:node_3).rational_number).to eq(RationalNumber.new(5,2))
+        expect(node(:node_2_1).rational_number).to eq(RationalNumber.new(8,3))
+        expect(node(:node_2_2).rational_number).to eq(RationalNumber.new(11,4))
+      end
+
     end
 
     describe "#move_to_top" do
@@ -761,5 +772,182 @@ describe Mongoid::Tree::RationalNumbering do
     end
 
   end # describe "testing validations"
+
+  describe "testing with timestamped nodes" do
+    before(:each) do
+      setup_tree <<-ENDTREE
+        - node_1:
+          - node_1_1
+          - node_1_2
+        - node_2:
+          - node_2_1
+          - node_2_2
+          - node_2_3
+        - node_3
+      ENDTREE
+    end
+
+    describe "siblings should keep timestamp, node should be updated" do
+      subject { RationalNumberedTimestampNode }
+
+      it "when inserting a new node" do
+        node_2_1_new = RationalNumberedTimestampNode.new(:name => "node_2_1_new")
+        node_2_1_new.rational_number_nv = node(:node_2_1).rational_number.nv
+        node_2_1_new.rational_number_dv = node(:node_2_1).rational_number.dv
+        prev_updated_at = node(:node_2_1).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node_2_1_new.save
+          expect(node_2_1_new.updated_at).to       be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_1).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+      it "when moving a node up" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_3).move_up
+          expect(node(:node_2_3).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+      it "when moving a node down" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_1).move_down
+          expect(node(:node_2_1).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+      it "when moving a to the bottom of a tree" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_1).move_to_bottom
+          expect(node(:node_2_1).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+      it "when moving a to the top of a tree" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_3).move_to_top
+          expect(node(:node_2_3).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+      it "when moving a node to a new parent" do
+        original_root = node(:node_1)
+        other_root    = node(:node_2)
+        child         = node(:node_1_2)
+        expect(child.position).to eq(2)
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          child.parent = other_root
+          child.save
+          child.reload
+          expect(node(:node_2_2).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+      it "when removing a node" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_1).destroy
+          expect(node(:node_2_2).updated_at).to    eq(prev_updated_at)
+        end
+      end
+
+    end # "on siblings it"
+
+    describe "when disabling auto_tree_timestamping, timestamps should be updated" do
+      subject { RationalNumberedTimestampNodeDisabledTimestamp }
+
+      it "when inserting a new node" do
+        node_2_1_new = RationalNumberedTimestampNodeDisabledTimestamp.create(:name => "node_2_1_new")
+        Timecop.freeze(Time.now + 30.minutes) do
+          node_2_1_new.move_to_rational_number(node(:node_2_1).rational_number_nv, node(:node_2_1).rational_number_dv)
+          node_2_1_new.save
+          expect(node_2_1_new.updated_at).to       be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_1).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+      it "when moving a node up" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_3).move_up
+          expect(node(:node_2_3).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+      it "when moving a node down" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_1).move_down
+          expect(node(:node_2_1).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+      it "when moving a to the bottom of a tree" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_1).move_to_bottom
+          expect(node(:node_2_1).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+      it "when moving a to the top of a tree" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_3).move_to_top
+          expect(node(:node_2_3).updated_at).to    be_within(2.seconds).of(Time.now)
+          expect(node(:node_2_2).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+      it "when moving a node to a new parent" do
+        original_root = node(:node_1)
+        other_root    = node(:node_2)
+        child         = node(:node_2_1)
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          child.parent = other_root
+          child.save
+          child.reload
+          expect(node(:node_2_2).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+      it "when removing a node" do
+        prev_updated_at = node(:node_2_2).updated_at
+        Timecop.freeze(Time.now + 30.minutes) do
+          node(:node_2_1).destroy
+          expect(node(:node_2_2).updated_at).to    be_within(2.seconds).of(Time.now)
+        end
+      end
+
+    end # "on siblings it"
+  end # "testing with timestamped nodes"
+
+  # describe "testing moving within siblings" do
+  #   before(:each) do
+  #     setup_tree <<-ENDTREE
+  #       - node_1
+  #       - node_2:
+  #         - node_2_1
+  #         - node_2_2
+  #       - node_3
+  #     ENDTREE
+  #   end
+  #   it "should move node_2_2 " do
+  #   end
+
+  # end
 
 end # Mongoid::Tree::RationalNumbering

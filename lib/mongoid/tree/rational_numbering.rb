@@ -52,6 +52,30 @@ module Mongoid
       end # included do
 
       module ClassMethods
+        attr_writer :auto_tree_timestamping
+
+        def auto_tree_timestamping
+          @auto_tree_timestamping.nil? ? true : @auto_tree_timestamping
+        end
+
+        ##
+        # Set options for rational numbers
+        #
+        # @param [Hash] options a hash
+        #
+        # :auto_tree_timestamping (true/false)
+        # Per default timestamps are only updated on the a node that is changed, and not siblings that are moved/shifted
+        # due to changes on a given node. Usually the tree position of a document does not give information about
+        # changes to the content of the document. This behaviour can be changed through the option
+        # ':auto_tree_timestamping'.
+
+        def rational_number_options(opts)
+          if !opts[:auto_tree_timestamping].nil?
+            @auto_tree_timestamping = !!opts[:auto_tree_timestamping]
+          else
+            @auto_tree_timestamping = true
+          end
+        end
 
         # helper metods for nv/dv
 
@@ -103,7 +127,6 @@ module Mongoid
       #
       def validate_rational_hierarchy
         if self.rational_number_nv_changed? && self.rational_number_dv_changed?
-          # puts "#{self.name} #{self.changes.inspect}"
           unless correct_rational_parent?(self.rational_number_nv, self.rational_number_dv)
             errors.add(:base, I18n.t(:cyclic, :scope => [:mongoid, :errors, :messages, :tree]))
           end
@@ -147,6 +170,10 @@ module Mongoid
 
         # shouldn't be any conflicting sibling now...
         self.from_rational_number(RationalNumber.new(nv,dv))
+        # if parent_id is unknown, find parent and set correct parent_id
+        if self.parent_id.nil? and self.rational_number.root?
+          # puts "!!!!!!!!! #{self.name} move_to_rational_number missing parent and NOT root rational number!"
+        end
       end
 
       ##
@@ -173,7 +200,7 @@ module Mongoid
         other = base_class.where(:rational_number_nv => nv).where(:rational_number_dv => dv).excludes(:id => self.id).first
         already_sibling_of = other.nil? ? false : self.sibling_of?(other)
 
-        # puts "  conflict: #{other.nil?} already_sibling_of :#{already_sibling_of}"
+        # puts "  conflicting node: #{other.nil? ? '-' : other.name } already_sibling_of :#{already_sibling_of}"
         return false if ensure_to_have_correct_parent(nv,dv) == false
 
         move_to_rational = RationalNumber.new(nv,dv)
@@ -245,12 +272,15 @@ module Mongoid
 
         conflicting_sibling = base_class.where(:rational_number_nv => nv).where(:rational_number_dv => dv).excludes(:id => self.id).first
         if (conflicting_sibling != nil)
-          # ensure_to_be_sibling_of(conflicting_sibling)
-          return if conflicting_sibling.position == self.position + 1
-          # If there are nodes between this and conflicting_sibling before move, make sure their position shifted before moving
-          _direction = (self.position > conflicting_sibling.position ? 1 : -1)
-          _position = (_direction < 0 ? conflicting_sibling.position + _direction : conflicting_sibling.position)
-          shift_nodes_position(conflicting_sibling, _direction, (_direction > 0 ? false : true))
+        # puts "moving conflicting nodes"
+          without_timestamping do
+            # ensure_to_be_sibling_of(conflicting_sibling)
+            return if conflicting_sibling.position == self.position + 1
+            # If there are nodes between this and conflicting_sibling before move, make sure their position shifted before moving
+            _direction = (self.position > conflicting_sibling.position ? 1 : -1)
+            _position = (_direction < 0 ? conflicting_sibling.position + _direction : conflicting_sibling.position)
+            shift_nodes_position(conflicting_sibling, _direction, (_direction > 0 ? false : true))
+          end
         end
       end
 
@@ -261,6 +291,7 @@ module Mongoid
       # @return [RationalNumber] returns the rational number for the ancestor or nil for "not found"
       #
       def query_ancestor_rational_number
+        # puts "  #{self.name} query_ancestor_rational_number parent_id: #{self.parent_id}"
         check_parent = base_class.where(:_id => self.parent_id).first
         return nil if (check_parent.nil? || check_parent == [])
         check_parent.rational_number
@@ -274,6 +305,7 @@ module Mongoid
       #
       def correct_rational_parent?(nv, dv)
         q_rational_number = query_ancestor_rational_number
+        # puts "  #{self.name} correct_rational_parent? nv: #{nv} dv: #{dv} query_ancestor_rational_number: #{q_rational_number.inspect}"
         if q_rational_number.nil?
           if RationalNumber.new(nv,dv).parent.root?
             return true
@@ -486,29 +518,33 @@ module Mongoid
       #
       #
       def shift_nodes_position(other, direction, exclude_other = false)
-        # puts "#{self.name} shift_nodes_position other: #{other.name} direction #{direction} exclude_other: #{exclude_other}"
-        if exclude_other
-          nodes_to_shift = siblings_between(other)
-        else
-          nodes_to_shift = siblings_between_including_other(other)
+        without_timestamping do
+          # puts "#{self.name} shift_nodes_position other: #{other.name} direction #{direction} exclude_other: #{exclude_other}"
+          if exclude_other
+            nodes_to_shift = siblings_between(other)
+          else
+            nodes_to_shift = siblings_between_including_other(other)
+          end
+          shift_nodes(nodes_to_shift, direction)
         end
-        shift_nodes(nodes_to_shift, direction)
       end
 
       def shift_lower_nodes_from_other(other, direction)
-        # puts "#{self.name} shift_lower_nodes_from_other other: #{other.name} direction: #{direction}"
-        range = [other.rational_number_value, other.siblings.last.rational_number_value].sort
+        # puts "#{self.name} shift_lower_nodes_from_other other: #{other.name} direction: #{direction} other.siblings_and_self.count: #{other.siblings_and_self.count}"
+        range = [other.rational_number_value, other.siblings_and_self.last.rational_number_value].sort
         nodes_to_shift = other.siblings_and_self.where(:rational_number_value.gte => range.first, :rational_number_value.lte => range.last)
         shift_nodes(nodes_to_shift, direction)
       end
 
       def shift_nodes(nodes_to_shift, direction)
         # puts "#{self.name} shift_nodes direction: #{direction}"
-        nodes_to_shift.each do |node_to_shift|
-          pos = node_to_shift.position + direction
-          # puts "  shifting #{node_to_shift.name} from position #{node_to_shift.position} to #{pos}"
-          node_to_shift.move_to_position(pos, {:force => true})
-          node_to_shift.save_with_force_rational_numbers!
+        without_timestamping do
+          nodes_to_shift.each do |node_to_shift|
+            pos = node_to_shift.position + direction
+            # puts "  shifting #{node_to_shift.name} from position #{node_to_shift.position} to #{pos}"
+            node_to_shift.move_to_position(pos, {:force => true})
+            node_to_shift.save_with_force_rational_numbers!
+          end
         end
       end
 
@@ -558,14 +594,29 @@ module Mongoid
         @_rational_moving_nodes = false
       end
 
+
+      ## These are only used when a document is shifted/moved because of repositioning another document.
+
+      ##
+      # Call block without triggeringtimestamps
+      # @param [&block] code block to call
+
+      def without_timestamping(&block)
+        # # puts "without_timestamping: Automagic timpestamping enabled? #{self.class.auto_tree_timestamping}"
+        disable_timestamp_callback() if self.class.auto_tree_timestamping
+        yield
+        enable_timestamp_callback()  if self.class.auto_tree_timestamping
+      end
+
       ##
       # Disable the timestamps for the document type, and increase the disable count
       # Will only disable once, even if called multiple times
       #
       # @return [undefined]
       def disable_timestamp_callback
+        # # puts "Disabling timestamp callback count: #{@@_disable_timestamp_count}"
         if self.respond_to?("updated_at")
-          self.class.skip_callback(:save, :before, :update_timestamps ) if @@_disable_timestamp_count == 0
+          self.class.skip_callback(:update, :before, :set_updated_at ) if @@_disable_timestamp_count == 0
           @@_disable_timestamp_count += 1
         end
       end
@@ -576,9 +627,10 @@ module Mongoid
       #
       # @return [undefined]
       def enable_timestamp_callback
+        # # puts "Enabling timestamp callback count: #{@@_disable_timestamp_count}"
         if self.respond_to?("updated_at")
           @@_disable_timestamp_count -= 1
-          self.class.set_callback(:save, :before, :update_timestamps ) if @@_disable_timestamp_count == 0
+          self.class.set_callback(:update, :before, :set_updated_at ) if @@_disable_timestamp_count == 0
         end
       end
 
@@ -661,6 +713,7 @@ module Mongoid
       # save when forcing rational numbers
       #
       def save_with_force_rational_numbers!
+        # puts "-- Saving #{self.name} #{self.updated_at.utc}" if self.respond_to?("updated_at")
         @_forced_rational_number = true
         self.save!
         @_forced_rational_number = false
@@ -699,9 +752,11 @@ module Mongoid
       def switch_with_sibling(sibling)
         self_pos = self.position
         sibling_pos = sibling.position
-        sibling.move_to_position(self_pos, {:force => true})
-        self.move_to_position(sibling_pos, {:force => true})
-        sibling.save_with_force_rational_numbers!
+        without_timestamping do
+          sibling.move_to_position(self_pos, {:force => true})
+          self.move_to_position(sibling_pos, {:force => true})
+          sibling.save_with_force_rational_numbers!
+        end
         self.save_with_force_rational_numbers!
       end
 
@@ -724,13 +779,18 @@ module Mongoid
         new_rational_number = RationalNumber.new(nv,dv)
         new_parent = nil
         # puts "  root: #{new_rational_number.root?} #{("parent: " + self.parent.name + " nv/dv : "+ self.parent.rational_number.nv.to_s+ "/"+ self.parent.rational_number.dv.to_s) unless self.parent.nil?}#{"parent: nil" if self.parent.nil?}"
-        if self.parent == nil
+        if self.parent.nil?
+          # puts "    new_rational_number.parent == RationalNumber.new #{new_rational_number.parent == RationalNumber.new}"
           return true if new_rational_number.parent == RationalNumber.new
+          new_parent = base_class.where(:rational_number_nv => new_rational_number.parent.nv, :rational_number_dv => new_rational_number.parent.dv).first
         elsif new_rational_number.parent.root?
+          # puts "    new_rational_number.parent.root? #{new_rational_number.parent.root?}"
           new_parent = nil
         else
+          # puts "    self.parent.rational_number == new_rational_number.parent #{self.parent.rational_number == new_rational_number.parent}"
           return true if self.parent.rational_number == new_rational_number.parent
-          new_parent = base_class.where(:rational_number_nv => new_rational_number.parent.nv, :rational_number_dv => new_rational_number.dv)
+          # puts "    searching for parent: #{new_rational_number.parent.nv}, #{new_rational_number.parent.dv}"
+          new_parent = base_class.where(:rational_number_nv => new_rational_number.parent.nv, :rational_number_dv => new_rational_number.parent.dv).first
           return false if new_parent.nil? # INVALID PARENT
         end
         # If entered here, the parent needs to change
@@ -738,14 +798,13 @@ module Mongoid
         self.parent = new_parent
       end
 
-      # FIX THESE SHIT CASE FUCK!
-
+      # Shifting/rekeying of lower siblings on destroy
       def move_lower_siblings
-        lower_siblings.each do |sibling|
-          disable_timestamp_callback
-          sibling.move_to_position(sibling.position - 1)
-          sibling.save_with_force_rational_numbers!
-          enable_timestamp_callback
+        without_timestamping do
+          lower_siblings.each do |sibling|
+            sibling.move_to_position(sibling.position - 1)
+            sibling.save_with_force_rational_numbers!
+          end
         end
       end
 
@@ -759,8 +818,6 @@ module Mongoid
       # def sibling_reposition_required?
       #   parent_id_changed? && persisted?
       # end
-
-
 
     end # RationalNumbering
   end # Tree

@@ -259,6 +259,40 @@ class Node
 end
 ```
 
+### Timestamps
+
+Per default timestamps are only updated on the a node that is changed, and not siblings that are moved/shifted due to changes on a given node. Usually the tree position of a document does not give information about changes to the content of the document. This behaviour can be changed through the option ```auto_tree_timestamping``` .
+
+Disable auto timestamps:
+
+```ruby
+class Node
+  include Mongoid::Document
+  include Mongoid::Tree
+  include Mongoid::Tree::RationalNumbering
+
+  self.auto_tree_timestamping = false
+
+  validates_associated :parent, :children
+end
+```
+
+Enable auto timestamps: (default behaviour)
+
+```ruby
+class Node
+  include Mongoid::Document
+  include Mongoid::Tree
+  include Mongoid::Tree::RationalNumbering
+
+  self.auto_tree_timestamping = false
+
+  validates_associated :parent, :children
+end
+```
+
+
+
 ## Build Status
 
 mongoid-tree is on [Travis CI](http://travis-ci.org/boxcms/mongoid-tree-rational) running the specs on Ruby Head, Ruby 1.9.3, JRuby (1.9 mode), and Rubinius (1.9 mode).
