@@ -5,7 +5,7 @@ class Node
 
   field :name
 
-  attr_accessible :name
+  # attr_accessible :name
 end
 
 class SubclassedNode < Node
@@ -24,7 +24,7 @@ class OrderedNode
 
   field :name
 
-  attr_accessible :name
+  # attr_accessible :name
 end
 
 class NodeWithEmbeddedDocument < Node
@@ -43,5 +43,5 @@ class RationalNumberedNode
 
   field :name
 
-  attr_accessible :name
+  # attr_accessible :name
 end

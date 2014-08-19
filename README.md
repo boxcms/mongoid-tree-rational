@@ -4,9 +4,10 @@ A tree structure for Mongoid documents using rational numbers and materialized p
 
 ## Requirements
 
-* mongoid (~> 3.0)
+* mongoid (~> 4.0)
 
-This version will only support mongoid 3.0+
+Version 2.x.x supports mongoid 4.x
+Version 0.1.x supports Mongoid 3.x
 
 ## Install
 
@@ -18,7 +19,7 @@ In order to get the latest development version of mongoid-tree:
 
     gem 'mongoid-tree-rational', :git => 'git://github.com/boxcms/mongoid-tree-rational', :require => 'mongoid/tree'
 
-You might want to remove the `:require => 'mongoid/tree'` option and explicitly `require 'mongoid/tree'` where needed and finally run
+You might want to add `:require => nil` option and explicitly `require 'mongoid/tree'` where needed and finally run
 
     bundle install
 

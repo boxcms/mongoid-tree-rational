@@ -22,11 +22,11 @@ module Mongoid
       @@_disable_timestamp_count = 0
 
       included do
-        field :rational_number_nv,    :type => Integer, :default => 0
-        field :rational_number_dv,    :type => Integer, :default => 1
-        field :rational_number_snv,   :type => Integer, :default => 1
-        field :rational_number_sdv,   :type => Integer, :default => 0
-        field :rational_number_value, :type => BigDecimal
+        field :rational_number_nv,    type: Integer, default: 0
+        field :rational_number_dv,    type: Integer, default: 1
+        field :rational_number_snv,   type: Integer, default: 1
+        field :rational_number_sdv,   type: Integer, default: 0
+        field :rational_number_value, type: BigDecimal
 
         validate          :validate_rational_hierarchy
 
@@ -47,7 +47,7 @@ module Mongoid
 
         after_destroy :move_lower_siblings
 
-        default_scope asc(:rational_number_value)
+        default_scope ->{ asc(:rational_number_value) }
 
       end # included do
 

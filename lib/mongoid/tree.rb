@@ -1,3 +1,5 @@
+require 'active_support/concern'
+
 module Mongoid
   ##
   # = Mongoid::Tree
@@ -88,8 +90,10 @@ module Mongoid
 
       belongs_to :parent, :class_name => self.name, :inverse_of => :children, :index => true, :validate => false
 
-      field :parent_ids, :type => Array, :default => []
+      field :parent_ids, type: Array, default: []
       index :parent_ids => 1
+      field :depth, type: Integer
+      index depth: 1
 
       set_callback :save, :after, :rearrange_children, :if => :rearrange_children?
       set_callback :validation, :before do
@@ -248,7 +252,7 @@ module Mongoid
     #
     # @return [Fixnum] Depth of this document
     def depth
-      parent_ids.count
+      super || parent_ids.count
     end
 
     ##
@@ -273,13 +277,7 @@ module Mongoid
     #
     # @return [Mongoid::Criteria] Mongoid criteria to retrieve the documents ancestors
     def ancestors
-      if parent_ids.any?
-        base_class.and({
-          '$or' => parent_ids.map { |id| { :_id => id } }
-        })
-      else
-        base_class.where(:_id.in => [])
-      end
+      base_class.where(:_id.in => parent_ids).order(:depth => :asc)
     end
 
     ##
@@ -428,6 +426,7 @@ module Mongoid
       else
         self.parent_ids = []
       end
+      self.depth = parent_ids.size
       rearrange_children! if self.parent_ids_changed?
     end
 
