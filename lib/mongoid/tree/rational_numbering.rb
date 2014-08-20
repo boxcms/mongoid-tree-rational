@@ -9,6 +9,31 @@ module Mongoid
     ##
     # = Mongoid::Tree::RationalNumbering
     #
+    # Provides rational number sorting on your tree structure.
+    # This makes it simple to query for a tree given a node in a single query.
+    # Given this tree
+    # Node 1
+    #   Node 1-1
+    #   Node 1-2
+    #     Node 1-2-1
+    #     Node 1-2-2
+    #       Node 1-2-2-1
+    #       Node 1-2-2-2
+    #     Node 1-2-3
+    #   Node 1-3
+    # Node 2
+    #   Node 2-1
+    #     Node 2-1-1
+    #     Node 2-1-2
+    #   Node 2-2
+    # Node 3
+    # Node 4
+    #
+    # The entire tree can be queried like this:
+    # node_2 = Node.where(title: "Node 2").first
+    # node_1.tree returns:
+    # ["Node 2", "Node 2-1", "Node 2-1-1", "Node 2-1-2", "Node 2-2"]
+    #
     # Mongoid::Tree doesn't use rational numbers by default. To enable rational numbering
     # of children include both Mongoid::Tree and Mongoid::Tree::RationalNumbering into
     # your document.
@@ -61,7 +86,7 @@ module Mongoid
         ##
         # Set options for rational numbers
         #
-        # @param [Hash] options a hash
+        # @param opts [Hash] a hash of options
         #
         # :auto_tree_timestamping (true/false)
         # Per default timestamps are only updated on the a node that is changed, and not siblings that are moved/shifted
@@ -110,7 +135,7 @@ module Mongoid
       ##
       # Initialize the rational tree document
       #
-      # @return [undefined]
+      # @return [void]
       #
       def initialize(*args)
         @_forced_rational_number = false
@@ -141,10 +166,10 @@ module Mongoid
       # if a document exists on the new position, all siblings are shifted right before moving this document
       # can move without updating conflicting siblings by using :force in options
       #
-      # @param [Integer] The positional value
-      # @param [Hash] Options: :force (defaults to false)
+      # @param _position  [Integer] The positional value
+      # @param opts       [Hash]    :force (defaults to false)
       #
-      # @return [undefined]
+      # @return [void]
       #
       def move_to_position(_position, opts = {})
         new_rational_number = parent_rational_number.child_from_position(_position)
@@ -158,11 +183,11 @@ module Mongoid
       # if a document exists on the new position, all siblings are shifted right before moving this document
       # can move without updating conflicting siblings by using :ignore_conflicts in options
       #
-      # @param [Integer] The nominator value
-      # @param [Integer] The denominator value
-      # @param [Hash] Options: :force (defaults to false)
+      # @param nv   [Integer] The nominator value
+      # @param dv   [Integer] The denominator value
+      # @param opts [Hash]    Options: :force (defaults to false)
       #
-      # @return [undefined]
+      # @return [void]
       #
       def move_to_rational_number(nv, dv, opts = {})
         # don't check for conflict if forced move
@@ -185,6 +210,12 @@ module Mongoid
       #
       # If the given nv/dv is higher than the last sibling under the parent, the nv/dv will be recalculated
       # to appropriate nv/dv values
+      #
+      # @param nv       [Integer] The nominator value
+      # @param dv       [Integer] The denominator value
+      # @param do_save  [Boolean] true/false if the model should be saved or just updated
+      #
+      # @return [Boolean] returns the save value or true if do_save is set to false
       #
       def set_rational_number(nv,dv, do_save = true)
         # return true of already at the right spot
@@ -250,6 +281,11 @@ module Mongoid
       # Will return true if the parent is "root" and the node should be created
       # as a root element
       #
+      # @param nv [Integer] The nominator value
+      # @param dv [Integer] The denominator value
+      #
+      # @return [Boolean] returns true if the parent exists
+      #
       def parent_exists?(nv,dv)
         q_parent = base_class.where(:rational_number_nv => nv).where(:rational_number_dv => dv).excludes(:id => self.id).first
         if q_parent.nil?
@@ -264,8 +300,10 @@ module Mongoid
       #
       # Move conflicting nodes for a given value
       #
-      # @param [Integer] The nominator value
-      # @param [Integer] The denominator value
+      # @param nv [Integer] The nominator value
+      # @param dv [Integer] The denominator value
+      #
+      # @return [void]
       #
       def move_conflicting_nodes(nv,dv)
         # As we are moving to the position of the conflicting sibling, it all items can be shifted similar to "move_above"
@@ -301,6 +339,9 @@ module Mongoid
       #
       # Verifies parent keys from calculation and query
       #
+      # @param nv [Integer] The nominator value
+      # @param dv [Integer] The denominator value
+      #
       # @return [Boolean] true for correct, else false
       #
       def correct_rational_parent?(nv, dv)
@@ -328,7 +369,7 @@ module Mongoid
       #
       # Rekey each of the children (usually forcefully if a tree has gone "crazy")
       #
-      # @return [undefined]
+      # @return [void]
       #
       def rekey_children
         _pos = 1
@@ -340,10 +381,22 @@ module Mongoid
         end
       end
 
+      ##
+      #
+      # Should the former siblings be rekeyed?
+      #
+      # @return [Boolean] true if needed, else false
+      #
       def rekey_former_siblings?
         persisted? && self.previous_changes.include?("parent_id")
       end
 
+      ##
+      #
+      # Rekey former siblings after a move
+      #
+      # @return [void]
+      #
       def rekey_former_siblings
         former_siblings = base_class.where(:parent_id => attribute_was('parent_id')).
                                      and(:rational_number_value.gt => (attribute_was('rational_number_value') || 0)).
@@ -354,6 +407,12 @@ module Mongoid
         end
       end
 
+      ##
+      #
+      # Move a node to given rational number and save/update the node
+      #
+      # @return [void]
+      #
       def move_node_and_save_if_changed(node, new_rational_number)
         if new_rational_number != node.rational_number
           node.move_to_rational_number(new_rational_number.nv, new_rational_number.dv, {:force => true})
@@ -374,8 +433,9 @@ module Mongoid
       ##
       # Convert from rational number and set keys accordingly
       #
-      # @param  [RationalNumber] The rational number for this node
-      # @return [undefined]
+      # @param rational_number [RationalNumber] The rational number for this node
+      #
+      # @return [void]
       #
       def from_rational_number(rational_number)
         self.rational_number_nv    = rational_number.nv
@@ -389,13 +449,15 @@ module Mongoid
       # Returns a chainable criteria for this document's ancestors
       #
       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's ancestors
+      #
       def ancestors
         base_class.unscoped { super }
       end
 
       ##
-      #
       # Returns the positional value for the current node
+      #
+      # @return [integer] The positional value calculated from the rational number
       #
       def position
         self.rational_number.position
@@ -406,6 +468,7 @@ module Mongoid
       # Siblings with a position greater than this document's position.
       #
       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's lower siblings
+      #
       def lower_siblings
         self.siblings.where(:rational_number_value.gt => self.rational_number_value)
       end
@@ -415,6 +478,7 @@ module Mongoid
       # Siblings with a position lower than this document's position.
       #
       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the document's higher siblings
+      #
       def higher_siblings
         self.siblings.where(:rational_number_value.lt => self.rational_number_value)
       end
@@ -423,7 +487,10 @@ module Mongoid
       # Returns siblings between the current document and the other document
       # Siblings with a position between this document's position and the other document's position.
       #
+      # @param other [Mongoid:Document] The other mongoid document
+      #
       # @return [Mongoid::Criteria] Mongoid criteria to retrieve the documents between this and the other document
+      #
       def siblings_between(other)
         range = [self.rational_number_value, other.rational_number_value].sort
         self.siblings.where(:rational_number_value.gt => range.first, :rational_number_value.lt => range.last)
@@ -431,6 +498,10 @@ module Mongoid
 
       ##
       # Return the siblings between this and other + other
+      #
+      # @param other [Mongoid:Document] The other mongoid document
+      #
+      # @return [Mongoid::Criteria] Mongoid criteria to retrieve the documents between this and the other document
       #
       def siblings_between_including_other(other)
         range = [self.rational_number_value, other.rational_number_value].sort
@@ -441,6 +512,7 @@ module Mongoid
       # Returns the lowest sibling (could be self)
       #
       # @return [Mongoid::Document] The lowest sibling
+      #
       def last_sibling_in_list
         siblings_and_self.last
       end
@@ -449,6 +521,7 @@ module Mongoid
       # Returns the highest sibling (could be self)
       #
       # @return [Mongoid::Document] The highest sibling
+      #
       def first_sibling_in_list
         siblings_and_self.first
       end
@@ -457,6 +530,7 @@ module Mongoid
       # Is this the highest sibling?
       #
       # @return [Boolean] Whether the document is the highest sibling
+      #
       def at_top?
         higher_siblings.empty?
       end
@@ -465,6 +539,7 @@ module Mongoid
       # Is this the lowest sibling?
       #
       # @return [Boolean] Whether the document is the lowest sibling
+      #
       def at_bottom?
         lower_siblings.empty?
       end
@@ -472,7 +547,8 @@ module Mongoid
       ##
       # Move this node above all its siblings
       #
-      # @return [undefined]
+      # @return [void]
+      #
       def move_to_top
         return true if at_top?
         move_above(first_sibling_in_list)
@@ -481,7 +557,8 @@ module Mongoid
       ##
       # Move this node below all its siblings
       #
-      # @return [undefined]
+      # @return [void]
+      #
       def move_to_bottom
         return true if at_bottom?
         move_below(last_sibling_in_list)
@@ -490,7 +567,8 @@ module Mongoid
       ##
       # Move this node one position up
       #
-      # @return [undefined]
+      # @return [void]
+      #
       def move_up
         unless at_top?
           prev_sibling = higher_siblings.last
@@ -501,7 +579,8 @@ module Mongoid
       ##
       # Move this node one position down
       #
-      # @return [undefined]
+      # @return [void]
+      #
       def move_down
         unless at_bottom?
           next_sibling = lower_siblings.first
@@ -512,10 +591,11 @@ module Mongoid
       ##
       # Shift nodes between self and other (or including other) in one or the other direction
       #
-      # @param [Mongoid::Tree] other document to move this document above
-      # @param [Integer] +1 / -1 for the direction to shift nodes
-      # @param [Boolean] exclude the other object in the shift or not.
+      # @param other          [Mongoid::Document]   Other document to move this document above
+      # @param direction      [Integer]             +1 / -1 for the direction to shift nodes
+      # @param exclude_other  [Boolean]             exclude the other object in the shift or not.
       #
+      # @return [void]
       #
       def shift_nodes_position(other, direction, exclude_other = false)
         without_timestamping do
@@ -529,6 +609,14 @@ module Mongoid
         end
       end
 
+      ##
+      # Shift nodes between self and other (or including other) in one or the other direction
+      #
+      # @param other          [Mongoid::Document]   Other document to move this document above
+      # @param direction      [Integer]             +1 / -1 for the direction to shift nodes
+      #
+      # @return [void]
+      #
       def shift_lower_nodes_from_other(other, direction)
         # puts "#{self.name} shift_lower_nodes_from_other other: #{other.name} direction: #{direction} other.siblings_and_self.count: #{other.siblings_and_self.count}"
         range = [other.rational_number_value, other.siblings_and_self.last.rational_number_value].sort
@@ -536,6 +624,14 @@ module Mongoid
         shift_nodes(nodes_to_shift, direction)
       end
 
+      ##
+      # Shift nodes in a direction
+      #
+      # @param nodes_to_shift   [Array]     Array of documents to shift in a given direction
+      # @param direction        [Integer]   +1 / -1 for the direction to shift nodes
+      #
+      # @return [void]
+      #
       def shift_nodes(nodes_to_shift, direction)
         # puts "#{self.name} shift_nodes direction: #{direction}"
         without_timestamping do
@@ -553,9 +649,10 @@ module Mongoid
       #
       # This method changes the node's parent if nescessary.
       #
-      # @param [Mongoid::Tree] other document to move this document above
+      # @param other [Mongoid::Document] document to move this document above
       #
-      # @return [undefined]
+      # @return [void]
+      #
       def move_above(other)
         ensure_to_be_sibling_of(other)
         return if other.position == self.position + 1
@@ -576,9 +673,10 @@ module Mongoid
       #
       # This method changes the node's parent if nescessary.
       #
-      # @param [Mongoid::Tree] other document to move this document below
+      # @param other [Mongoid::Document] document to move this document above
       #
-      # @return [undefined]
+      # @return [void]
+      #
       def move_below(other)
         ensure_to_be_sibling_of(other)
         return if other.position + 1 == self.position
@@ -599,8 +697,10 @@ module Mongoid
 
       ##
       # Call block without triggeringtimestamps
-      # @param [&block] code block to call
-
+      # @param block code block to call
+      #
+      # @return [void]
+      #
       def without_timestamping(&block)
         # # puts "without_timestamping: Automagic timpestamping enabled? #{self.class.auto_tree_timestamping}"
         disable_timestamp_callback() if self.class.auto_tree_timestamping
@@ -612,7 +712,7 @@ module Mongoid
       # Disable the timestamps for the document type, and increase the disable count
       # Will only disable once, even if called multiple times
       #
-      # @return [undefined]
+      # @return [void]
       def disable_timestamp_callback
         # # puts "Disabling timestamp callback count: #{@@_disable_timestamp_count}"
         if self.respond_to?("updated_at")
@@ -625,7 +725,7 @@ module Mongoid
       # Enable the timestamps for the document type, and decrease the disable count
       # Will only enable once, even if called multiple times
       #
-      # @return [undefined]
+      # @return [void]
       def enable_timestamp_callback
         # # puts "Enabling timestamp callback count: #{@@_disable_timestamp_count}"
         if self.respond_to?("updated_at")
@@ -646,7 +746,7 @@ module Mongoid
       # If there are both changes to nv/dv and parent_id, nv/dv settings takes
       # precedence over parent_id changes
       #
-      # @return [undefined]
+      # @return [void]
       #
       def update_rational_number
         if self.rational_number_nv_changed? && self.rational_number_dv_changed? && !self.rational_number_value.nil? && !set_initial_rational_number?
@@ -745,9 +845,9 @@ module Mongoid
       #
       # Switch location with a given sibling
       #
-      # @param [Mongoid::Tree] other document to switch places with
+      # @param sibling [Mongoid:Document] The other sibling document to switch place with
       #
-      # @return [undefined]
+      # @return [void]
       #
       def switch_with_sibling(sibling)
         self_pos = self.position
@@ -764,9 +864,9 @@ module Mongoid
       #
       # Ensure this is a sibling of given other, if not, move it to the same parent
       #
-      # @param [Mongoid::Tree] other document to ensure sibling relation
+      # @param other [Mongoid:Document] The other mongoid document to ensure sibling relation
       #
-      # @return [undefined]
+      # @return [void]
       #
       def ensure_to_be_sibling_of(other)
         return if sibling_of?(other)
@@ -774,6 +874,15 @@ module Mongoid
         save!
       end
 
+      ##
+      #
+      # Make sure the correct parent is set, if not, update the parent accordingly
+      #
+      # @param nv [Integer] The nominator value
+      # @param dv [Integer] The denominator value
+      #
+      # @return [void]
+      #
       def ensure_to_have_correct_parent(nv,dv)
         # puts "#{self.name} ensure_to_have_correct_parent #{nv}/#{dv}"
         new_rational_number = RationalNumber.new(nv,dv)
@@ -798,7 +907,10 @@ module Mongoid
         self.parent = new_parent
       end
 
+      ##
+      #
       # Shifting/rekeying of lower siblings on destroy
+      #
       def move_lower_siblings
         without_timestamping do
           lower_siblings.each do |sibling|

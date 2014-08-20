@@ -361,7 +361,7 @@ module Mongoid
     ##
     # Forces rearranging of all children after next save
     #
-    # @return [undefined]
+    # @return [void]
     def rearrange_children!
       @rearrange_children = true
     end
@@ -377,7 +377,7 @@ module Mongoid
     ##
     # Nullifies all children's parent_id
     #
-    # @return [undefined]
+    # @return [void]
     def nullify_children
       children.each do |c|
         c.parent = c.parent_id = nil
@@ -388,7 +388,7 @@ module Mongoid
     ##
     # Moves all children to this document's parent
     #
-    # @return [undefined]
+    # @return [void]
     def move_children_to_parent
       children.each do |c|
         c.parent = self.parent
@@ -399,7 +399,7 @@ module Mongoid
     ##
     # Deletes all descendants using the database (doesn't invoke callbacks)
     #
-    # @return [undefined]
+    # @return [void]
     def delete_descendants
       base_class.delete_all(:conditions => { :parent_ids => self.id })
     end
@@ -407,7 +407,7 @@ module Mongoid
     ##
     # Destroys all children by calling their #destroy method (does invoke callbacks)
     #
-    # @return [undefined]
+    # @return [void]
     def destroy_children
       children.destroy_all
     end
@@ -419,7 +419,7 @@ module Mongoid
     # rearrangement when the parent_ids changed
     #
     # @private
-    # @return [undefined]
+    # @return [void]
     def rearrange
       if self.parent_id
         self.parent_ids = parent.parent_ids + [self.parent_id]

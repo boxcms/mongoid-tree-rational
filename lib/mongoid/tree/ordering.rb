@@ -113,7 +113,7 @@ module Mongoid
       ##
       # Move this node above all its siblings
       #
-      # @return [undefined]
+      # @return [void]
       def move_to_top
         return true if at_top?
         move_above(first_sibling_in_list)
@@ -122,7 +122,7 @@ module Mongoid
       ##
       # Move this node below all its siblings
       #
-      # @return [undefined]
+      # @return [void]
       def move_to_bottom
         return true if at_bottom?
         move_below(last_sibling_in_list)
@@ -131,7 +131,7 @@ module Mongoid
       ##
       # Move this node one position up
       #
-      # @return [undefined]
+      # @return [void]
       def move_up
         switch_with_sibling_at_offset(-1) unless at_top?
       end
@@ -139,7 +139,7 @@ module Mongoid
       ##
       # Move this node one position down
       #
-      # @return [undefined]
+      # @return [void]
       def move_down
         switch_with_sibling_at_offset(1) unless at_bottom?
       end
@@ -151,7 +151,7 @@ module Mongoid
       #
       # @param [Mongoid::Tree] other document to move this document above
       #
-      # @return [undefined]
+      # @return [void]
       def move_above(other)
         ensure_to_be_sibling_of(other)
 
@@ -175,7 +175,7 @@ module Mongoid
       #
       # @param [Mongoid::Tree] other document to move this document below
       #
-      # @return [undefined]
+      # @return [void]
       def move_below(other)
         ensure_to_be_sibling_of(other)
 
