@@ -16,16 +16,11 @@ RSpec::Core::RakeTask.new(:spec) do |spec|
   spec.pattern = FileList['spec/**/*_spec.rb']
 end
 
-RSpec::Core::RakeTask.new(:rcov) do |spec|
-  spec.pattern = 'spec/**/*_spec.rb'
-  spec.rcov = true
-end
-
 task :default => :spec
 
 YARD::Rake::YardocTask.new(:doc)
 
-desc "Open an irb session"
+desc "Open an irb session with spec_helper loaded"
 task :test_console do
   require 'ap'
   sh "irb -rubygems -I lib -r ./spec/spec_helper.rb"
