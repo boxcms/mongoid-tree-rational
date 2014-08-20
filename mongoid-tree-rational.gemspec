@@ -11,7 +11,7 @@ Gem::Specification.new do |s|
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib"]
   s.authors = ["Leif Ringstad", "Benedikt Deicke"]
-  s.date = "2014-08-19"
+  s.date = "2014-08-20"
   s.description = "A tree structure for Mongoid documents using the materialized path pattern and rational number sorting."
   s.email = "leifcr@gmail.com"
   s.extra_rdoc_files = [
@@ -62,9 +62,8 @@ Gem::Specification.new do |s|
       s.add_development_dependency(%q<rb-inotify>, [">= 0"])
       s.add_development_dependency(%q<rb-fsevent>, [">= 0"])
       s.add_development_dependency(%q<wdm>, [">= 0"])
-      s.add_development_dependency(%q<hirb>, [">= 0"])
-      s.add_development_dependency(%q<wirble>, [">= 0"])
       s.add_development_dependency(%q<awesome_print>, [">= 0"])
+      s.add_development_dependency(%q<timecop>, [">= 0"])
       s.add_development_dependency(%q<coveralls>, [">= 0"])
       s.add_development_dependency(%q<simplecov>, [">= 0"])
     else
@@ -79,9 +78,8 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<rb-inotify>, [">= 0"])
       s.add_dependency(%q<rb-fsevent>, [">= 0"])
       s.add_dependency(%q<wdm>, [">= 0"])
-      s.add_dependency(%q<hirb>, [">= 0"])
-      s.add_dependency(%q<wirble>, [">= 0"])
       s.add_dependency(%q<awesome_print>, [">= 0"])
+      s.add_dependency(%q<timecop>, [">= 0"])
       s.add_dependency(%q<coveralls>, [">= 0"])
       s.add_dependency(%q<simplecov>, [">= 0"])
     end
@@ -97,9 +95,8 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<rb-inotify>, [">= 0"])
     s.add_dependency(%q<rb-fsevent>, [">= 0"])
     s.add_dependency(%q<wdm>, [">= 0"])
-    s.add_dependency(%q<hirb>, [">= 0"])
-    s.add_dependency(%q<wirble>, [">= 0"])
     s.add_dependency(%q<awesome_print>, [">= 0"])
+    s.add_dependency(%q<timecop>, [">= 0"])
     s.add_dependency(%q<coveralls>, [">= 0"])
     s.add_dependency(%q<simplecov>, [">= 0"])
   end
