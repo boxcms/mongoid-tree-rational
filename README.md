@@ -78,8 +78,7 @@ See `Mongoid::Tree` for more information on these methods.
 
 To use rational ordering, include the `Mongoid::Tree::RationalNumbering` module. This will add a `position` field to your document and provide additional utility methods:
 
-While rational numbering requires more processing when saving, it does give the benefit of querying an entire tree in one go.
-
+While rational numbering requires more processing when saving, it does give the benefit of querying an entire tree in one query. This is really use
 
 Mathematical details about rational numbers in nested trees can be found here: [http://arxiv.org/pdf/0806.3115v1.pdf](http://arxiv.org/pdf/0806.3115v1.pdf)
 
@@ -125,7 +124,7 @@ Node.rekey_all! # Will iterate over the entire tree and rekey every single node.
 end
 ```
 
-You can get the entire tree in one go like this:
+Examples on querying trees:
 
 ```ruby
 # - node_1
@@ -141,6 +140,14 @@ You can get the entire tree in one go like this:
 
 Node.all  # Get the entire tree
 # -> [node_1, node_1_1, node_1_2, node_2, node_2_1, node_2_1_1, node_2_1_2, node_2_2, node_2_2_1, node_2_2_2]
+node_1.tree # Get tree below node 1
+# -> [node_1_1, node_1_2]
+node_1.tree_and_self # Get tree below node 1 including node_1
+# -> [node_1, node_1_1, node_1_2]
+node_2.tree # Get tree below node 1 including node_1
+# -> [node_2_1, node_2_1_1, node_2_1_2, node_2_2, node_2_2_1, node_2_2_2]
+node_2.tree_and_self # Get tree below node 1 including node_1
+# -> [node_2, node_2_1, node_2_1_1, node_2_1_2, node_2_2, node_2_2_1, node_2_2_2]
 end
 ```
 
