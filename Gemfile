@@ -14,13 +14,12 @@ group :development do
   gem 'wdm', :platforms => [:mswin, :mingw], :require => false
   gem 'awesome_print'
   gem 'timecop'
+  platforms :rbx do
+    gem 'rubysl-rake', '~> 2.0'
+  end
 end
 
 group :development, :test do
   gem 'coveralls', :require => false
   gem 'simplecov', :require => false
-end
-
-platforms :rbx do
-  gem 'rubysl-rake', '~> 2.0'
 end
